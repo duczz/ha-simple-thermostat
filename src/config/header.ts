@@ -24,6 +24,7 @@ export const STATE_ICONS = {
 }
 
 export const MODE_ICONS = {
+  // HVAC modes
   auto: 'hass:autorenew',
   cool: 'hass:snowflake',
   dry: 'hass:water-percent',
@@ -31,6 +32,28 @@ export const MODE_ICONS = {
   heat_cool: 'hass:autorenew',
   heat: 'hass:fire',
   off: 'hass:power',
+  // Preset modes
+  none: 'mdi:minus-circle-outline',
+  eco: 'mdi:leaf',
+  away: 'mdi:home-export-outline',
+  boost: 'mdi:rocket-launch',
+  comfort: 'mdi:sofa',
+  home: 'mdi:home',
+  sleep: 'mdi:sleep',
+  activity: 'mdi:run',
+  // Fan modes
+  on: 'mdi:fan',
+  low: 'mdi:fan-speed-1',
+  medium: 'mdi:fan-speed-2',
+  high: 'mdi:fan-speed-3',
+  turbo: 'mdi:fan-alert',
+  quiet: 'mdi:fan-minus',
+  // Swing modes
+  vertical: 'mdi:arrow-up-down',
+  horizontal: 'mdi:arrow-left-right',
+  both: 'mdi:arrow-all',
+  upper: 'mdi:arrow-up',
+  lower: 'mdi:arrow-down',
 }
 
 type Icon = string | false | LooseObject
@@ -46,7 +69,7 @@ export interface HeaderData {
   name?: Name
   icon: Icon
   faults?: Array<Fault>
-  toggle?: Toggle
+  toggle?: Toggle | null
 }
 
 export interface Toggle {
@@ -84,12 +107,13 @@ export default function parseHeaderConfig(
   }
 }
 
-function parseToggle(config: ToggleConfig, hass): Toggle {
+function parseToggle(config: ToggleConfig, hass): Toggle | null {
   const entity: HAState = hass.states[config.entity]
+  if (!entity) return null
 
   let label = ''
   if (config?.name === true) {
-    label = entity.attributes.name
+    label = entity.attributes.friendly_name
   } else {
     label = (config?.name as string) ?? ''
   }
@@ -97,15 +121,15 @@ function parseToggle(config: ToggleConfig, hass): Toggle {
   return { entity, label }
 }
 
-function parseFaults(config: Array<Fault>, hass: HASS) {
+function parseFaults(config: Array<Fault> | undefined, hass: HASS) {
   if (Array.isArray(config)) {
-    return config.map(({ entity, ...rest }: Fault) => {
-      return {
+    return config
+      .filter(({ entity }) => Boolean(hass.states?.[entity]))
+      .map(({ entity, ...rest }: Fault) => ({
         ...rest,
         state: hass.states[entity],
         entity,
-      }
-    })
+      }))
   }
   return []
 }
