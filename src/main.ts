@@ -411,7 +411,7 @@ export default class SimpleThermostat extends LitElement {
 
     const unit = this.getUnit()
 
-    const stepLayout = this.config?.layout?.step ?? 'column'
+    const stepLayout = this.config?.layout?.step ?? 'row'
     const row = stepLayout === 'row'
 
     const classes = [!this.header && 'no-header', action].filter((cx) => !!cx)

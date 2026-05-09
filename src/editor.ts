@@ -89,7 +89,7 @@ export default class SimpleThermostatEditor extends LitElement {
                   label="Name (optional)"
                   .value="${this.config.header?.name ?? ''}"
                   .configValue="${'header.name'}"
-                  @change="${this.valueChanged}"
+                  @input="${this.valueChanged}"
                 ></ha-textfield>
                 <ha-icon-picker
                   label="Icon (optional)"
@@ -111,7 +111,7 @@ export default class SimpleThermostatEditor extends LitElement {
                   label="Toggle label"
                   .value="${this.config?.header?.toggle?.name ?? ''}"
                   .configValue="${'header.toggle.name'}"
-                  @change="${this.valueChanged}"
+                  @input="${this.valueChanged}"
                 ></ha-textfield>
               </div>
             ` : ''}
@@ -170,14 +170,14 @@ export default class SimpleThermostatEditor extends LitElement {
                 label="Unit (optional)"
                 .value="${this.config.unit ?? ''}"
                 .configValue="${'unit'}"
-                @change="${this.valueChanged}"
+                @input="${this.valueChanged}"
               ></ha-textfield>
             </div>
             <div class="side-by-side">
               <ha-selector
                 .hass=${this.hass}
                 .selector=${{ select: { options: ['column', 'row'], mode: 'dropdown' } }}
-                .value=${this.config.layout?.step ?? 'column'}
+                .value=${this.config.layout?.step ?? 'row'}
                 .label=${'Step layout'}
                 .configValue=${'layout.step'}
                 @value-changed=${this.valueChanged}
@@ -195,7 +195,7 @@ export default class SimpleThermostatEditor extends LitElement {
               label="Fallback text (optional)"
               .value="${this.config.fallback ?? ''}"
               .configValue="${'fallback'}"
-              @change="${this.valueChanged}"
+              @input="${this.valueChanged}"
             ></ha-textfield>
           </div>
         </ha-expansion-panel>
