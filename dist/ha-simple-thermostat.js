@@ -271,7 +271,7 @@ ha-switch {
 }
 .side-by-side {
   display: flex;
-  align-items: stretch;
+  align-items: flex-end;
   gap: 8px;
   margin-bottom: 8px;
 }
@@ -644,7 +644,7 @@ ha-switch {
           </div>
         </ha-expansion-panel>
 
-        <ha-expansion-panel .header=${"Custom CSS"} outlined expanded>
+        <ha-expansion-panel .header=${"Custom CSS"} outlined>
           <div class="panel-content">
             <p class="styles-hint">
               Use <code>--st-*</code> variables or target any selector inside the card.
