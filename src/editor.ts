@@ -200,7 +200,7 @@ export default class SimpleThermostatEditor extends LitElement {
           </div>
         </ha-expansion-panel>
 
-        <ha-expansion-panel .header=${'Custom CSS'} outlined expanded>
+        <ha-expansion-panel .header=${'Custom CSS'} outlined>
           <div class="panel-content">
             <p class="styles-hint">
               Use <code>--st-*</code> variables or target any selector inside the card.
