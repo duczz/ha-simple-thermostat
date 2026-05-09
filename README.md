@@ -418,15 +418,17 @@ The CSS is scoped to the card's Shadow DOM. You can override any `--st-*` custom
 
 ### Styling individual modes
 
-A common use case is giving each active mode button a different color (e.g. blue for cooling, orange for heating). You can target the specific mode classes:
+A common use case is giving each active mode button a different color (e.g. blue for cooling, orange for heating). The card has built-in variables for exactly this purpose:
 
 ```yaml
 styles: |
-  .mode-item.active.cool { background: rgba(43, 154, 249, 0.8); }
-  .mode-item.active.heat { background: rgba(255, 129, 0, 0.8); }
-  .mode-item.active.auto { background: rgba(0, 128, 0, 0.8); }
-  .mode-item.active.dry { background: rgba(239, 189, 7, 0.8); }
-  .mode-item.active.off { background: rgba(138, 138, 138, 0.2); color: var(--primary-text-color); }
+  ha-card {
+    --cool-color: rgba(43, 154, 249, 0.8);
+    --heat-color: rgba(255, 129, 0, 0.8);
+    --auto-color: rgba(0, 128, 0, 0.8);
+    --dry-color: rgba(239, 189, 7, 0.8);
+    --off-color: rgba(138, 138, 138, 0.2);
+  }
 ```
 
 > **Note:** `styles` is applied after all built-in styles, so it always takes precedence. You do not need card-mod for per-card overrides.
