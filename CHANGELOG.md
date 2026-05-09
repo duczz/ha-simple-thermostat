@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.3.1 - Unreleased]
+
+### ✨ Improvements
+
+- **Live updates in editor** — Text fields in the visual editor now update the card preview live on keystroke instead of on blur
+- **New default step layout** — Changed default `layout.step` from `column` to `row` for a more compact temperature control display by default
+- **Editor field alignment** — Fixed vertical alignment of side-by-side editor fields (like Toggle entity vs Toggle label)
+- **Collapsed Custom CSS menu** — The "Custom CSS" panel in the visual editor is now collapsed by default to reduce clutter
+
+### 🔨 Tooling & Build
+
+- **GitHub Release workflow** — Added automated release workflow via GitHub Actions
+- **Repository URLs** — Updated `hacs.json` and `package.json` with the new repository location
+- **Artifact rename** — Renamed main built file to `ha-simple-thermostat.js`
+
 ## [2.3.0] – 2026-05-07
 
 This release modernises the card for current Home Assistant versions (2024.1+), fixes numerous crashes, and improves the visual editor, accessibility, and build tooling. The original release (v2.2.2) has not been updated since 2021.
