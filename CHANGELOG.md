@@ -59,7 +59,7 @@
 
 - **GitHub Release workflow** — Added automated release workflow via GitHub Actions
 - **Repository URLs** — Updated `hacs.json` and `package.json` with the new repository location
-- **Artifact rename** — Renamed main built file to `ha-simple-thermostat.js`
+- **Artifact name** — Built file is `simple-thermostat.js` (matches the original fork)
 
 
 ## [2.3.0] – 2026-05-07
