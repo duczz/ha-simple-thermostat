@@ -2,7 +2,7 @@
   "name": "simple-thermostat",
   "version": "2.3.1",
   "description": "A different take on the thermostat card for Home Assistant Lovelace UI",
-  "main": "dist/ha-simple-thermostat.js",
+  "main": "dist/simple-thermostat.js",
   "type": "module",
   "repository": "https://github.com/duczz/ha-simple-thermostat.git",
   "author": "Raymond Julin <raymond.julin@gmail.com>",

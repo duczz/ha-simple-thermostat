@@ -29,7 +29,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add dist/ha-simple-thermostat.js
+          git add dist/simple-thermostat.js
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
