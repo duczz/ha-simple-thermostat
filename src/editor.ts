@@ -188,12 +188,12 @@ export default class SimpleThermostatEditor extends LitElement {
               <ha-selector
                 .hass=${this.hass}
                 .selector=${{ select: { options: [
-                  { value: '', label: 'Auto (from entity)' },
+                  { value: 'auto', label: 'Auto (from entity)' },
                   { value: '0.1', label: '0.1' },
                   { value: '0.5', label: '0.5' },
                   { value: '1', label: '1' },
                 ], mode: 'dropdown' } }}
-                .value=${this.config.step_size != null ? String(this.config.step_size) : ''}
+                .value=${this.config.step_size != null ? String(this.config.step_size) : 'auto'}
                 .label=${'Step size'}
                 .configValue=${'step_size'}
                 @value-changed=${this.valueChanged}
@@ -338,7 +338,7 @@ export default class SimpleThermostatEditor extends LitElement {
           : ev.detail?.value !== undefined
           ? ev.detail.value
           : target.value
-      if (value === '' || value === undefined) {
+      if (value === '' || value === undefined || (target.configValue === 'step_size' && value === 'auto')) {
         deletePath(copy, target.configValue)
       } else {
         if (typeof value === 'string' && NUMERIC_CONFIG_PATHS.includes(target.configValue)) {
