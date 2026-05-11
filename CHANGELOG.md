@@ -4,7 +4,7 @@
 
 ### ⚠️ Breaking Changes
 
-- **Resource URL changed** — The built file was renamed from `ha-simple-thermostat.js` to `simple-thermostat.js`. Update your Lovelace resource from `/hacsfiles/ha-simple-thermostat/ha-simple-thermostat.js` to `/hacsfiles/ha-simple-thermostat/simple-thermostat.js`
+- **Resource URL changed** — The built file was renamed from `ha-simple-thermostat.js` to `simple-thermostat.js`. The easiest fix is to **reinstall via HACS** — this automatically sets the correct resource URL. If you prefer to update manually, change your Lovelace resource from `/hacsfiles/ha-simple-thermostat/ha-simple-thermostat.js` to `/hacsfiles/ha-simple-thermostat/simple-thermostat.js`
 
 ### 🎨 Design Polish
 
