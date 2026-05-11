@@ -75,8 +75,9 @@ export interface HeaderData {
 export interface Toggle {
   entity: HAState
   label: string
+  icon: string | false
 }
-export type ToggleConfig = { entity: string; name?: string | boolean }
+export type ToggleConfig = { entity: string; name?: string | boolean; icon?: string }
 
 export default function parseHeaderConfig(
   config: false | HeaderConfig,
@@ -118,7 +119,7 @@ function parseToggle(config: ToggleConfig, hass): Toggle | null {
     label = (config?.name as string) ?? ''
   }
 
-  return { entity, label }
+  return { entity, label, icon: config?.icon ?? false }
 }
 
 function parseFaults(config: Array<Fault> | undefined, hass: HASS) {

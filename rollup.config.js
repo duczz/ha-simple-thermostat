@@ -17,6 +17,7 @@ const shared = (DEBUG) => [
   inject(
     {
       DEBUG,
+      BUILD_TIME: new Date().toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
     },
     { exclude: '**/*.css' }
   ),
@@ -53,14 +54,5 @@ export default [
         },
       }),
     ],
-  },
-  {
-    input: 'src/simple-thermostat.ts',
-    output: {
-      file: 'dist/ha-simple-thermostat.debug.js',
-      format: 'es',
-      name: 'SimpleThermostat',
-    },
-    plugins: shared(true),
   },
 ]

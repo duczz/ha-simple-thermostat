@@ -67,4 +67,42 @@ describe('parseHeader', () => {
       expect(result.toggle?.label).toBe('Heater Switch')
     }
   })
+
+  test('toggle icon defaults to false when not configured', () => {
+    const hass = makeHass({
+      'switch.heater': {
+        state: 'on',
+        entity_id: 'switch.heater',
+        attributes: { friendly_name: 'Heater Switch' },
+      },
+    })
+    const result = parseHeader(
+      { toggle: { entity: 'switch.heater' } },
+      makeEntity(),
+      hass
+    )
+    expect(result).not.toBe(false)
+    if (result !== false) {
+      expect(result.toggle?.icon).toBe(false)
+    }
+  })
+
+  test('toggle icon is preserved when configured', () => {
+    const hass = makeHass({
+      'switch.heater': {
+        state: 'on',
+        entity_id: 'switch.heater',
+        attributes: { friendly_name: 'Heater Switch' },
+      },
+    })
+    const result = parseHeader(
+      { toggle: { entity: 'switch.heater', icon: 'mdi:rocket-launch' } },
+      makeEntity(),
+      hass
+    )
+    expect(result).not.toBe(false)
+    if (result !== false) {
+      expect(result.toggle?.icon).toBe('mdi:rocket-launch')
+    }
+  })
 })

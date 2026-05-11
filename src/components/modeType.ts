@@ -41,8 +41,15 @@ export default function renderModeType({
   }
 
   const str = type === 'hvac' ? 'operation' : `${type}_mode`
-  const title = name || localize(`ui.card.climate.${str}`)
-  const headings = modeOptions?.headings ?? true
+  let title = name || localize(`ui.card.climate.${str}`)
+  if (title === `ui.card.climate.${str}`) {
+    const attrKey = `state_attributes.climate.${type === 'hvac' ? 'hvac' : type}_mode`
+    title = localize(attrKey)
+    if (title === attrKey) {
+      title = str === 'operation' ? 'Operation' : 'Mode'
+    }
+  }
+  const headings = modeOptions?.headings ?? false
 
   return html`
     <div class="modes ${headings ? 'heading' : ''}" role="group" aria-label=${title}>

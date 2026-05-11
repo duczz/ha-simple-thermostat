@@ -63,6 +63,17 @@ interface CardConfig {
     temperature?: string
     state?: string
   }
+  tap_action?: TapAction
+  hold_action?: TapAction
+  double_tap_action?: TapAction
 }
+
+export type TapAction =
+  | { action: 'more-info' }
+  | { action: 'none' }
+  | { action: 'navigate'; navigation_path: string }
+  | { action: 'url'; url_path: string }
+  | { action: 'toggle' }
+  | { action: 'call-service'; service: string; service_data?: LooseObject }
 
 export { CardConfig }

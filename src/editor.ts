@@ -2,7 +2,10 @@ import { LitElement, html } from 'lit'
 import styles from './styles.css'
 import fireEvent from './fireEvent'
 
+import { version } from '../package.json'
 import { CardConfig } from './config/card'
+declare const process: { env: { BUILD_TIME: string } }
+const BUILD_TIME = process.env.BUILD_TIME
 import { HASS } from './types'
 
 function setValue(obj, path, value) {
@@ -60,7 +63,7 @@ export default class SimpleThermostatEditor extends LitElement {
   }
 
   render() {
-    if (!this.hass) return html``
+    if (!this.hass || !this.config) return html``
 
     return html`
       <div class="card-config">
@@ -114,58 +117,58 @@ export default class SimpleThermostatEditor extends LitElement {
                   @input="${this.valueChanged}"
                 ></ha-textfield>
               </div>
+              ${this.config?.header?.toggle?.entity ? html`
+                <ha-icon-picker
+                  label="Toggle icon (optional)"
+                  .value="${this.config?.header?.toggle?.icon ?? ''}"
+                  .configValue=${'header.toggle.icon'}
+                  @value-changed=${this.valueChanged}
+                ></ha-icon-picker>
+              ` : ''}
             ` : ''}
           </div>
         </ha-expansion-panel>
 
         <ha-expansion-panel .header=${'Mode Controls'} outlined>
           <div class="panel-content">
-            <ha-formfield label="Show mode controls">
-              <ha-switch
-                .checked=${this.config.control !== false}
-                @change=${this.toggleControl}
-              ></ha-switch>
-            </ha-formfield>
-
-            ${this.config.control !== false ? html`
-              <div class="editor-switches">
-                <ha-formfield label="Show mode names">
-                  <ha-switch
-                    .checked=${this.config?.layout?.mode?.names !== false}
-                    .configValue="${'layout.mode.names'}"
-                    @change=${this.valueChanged}
-                  ></ha-switch>
-                </ha-formfield>
-                <ha-formfield label="Show mode icons">
-                  <ha-switch
-                    .checked=${this.config?.layout?.mode?.icons !== false}
-                    .configValue="${'layout.mode.icons'}"
-                    @change=${this.valueChanged}
-                  ></ha-switch>
-                </ha-formfield>
-                <ha-formfield label="Show mode headings">
-                  <ha-switch
-                    .checked=${this.config?.layout?.mode?.headings !== false}
-                    .configValue="${'layout.mode.headings'}"
-                    @change=${this.valueChanged}
-                  ></ha-switch>
-                </ha-formfield>
-              </div>
-            ` : ''}
+            <div class="editor-switches">
+              <ha-formfield label="Show mode names">
+                <ha-switch
+                  .checked=${this.config?.layout?.mode?.names !== false}
+                  .configValue="${'layout.mode.names'}"
+                  @change=${this.valueChanged}
+                ></ha-switch>
+              </ha-formfield>
+              <ha-formfield label="Show mode icons">
+                <ha-switch
+                  .checked=${this.config?.layout?.mode?.icons !== false}
+                  .configValue="${'layout.mode.icons'}"
+                  @change=${this.valueChanged}
+                ></ha-switch>
+              </ha-formfield>
+              <ha-formfield label="Show mode headings">
+                <ha-switch
+                  .checked=${this.config?.layout?.mode?.headings === true}
+                  .configValue="${'layout.mode.headings'}"
+                  @change=${this.valueChanged}
+                ></ha-switch>
+              </ha-formfield>
+            </div>
           </div>
         </ha-expansion-panel>
 
         <ha-expansion-panel .header=${'Layout & Display'} outlined>
           <div class="panel-content">
             <div class="side-by-side">
-              <ha-selector
-                .hass=${this.hass}
-                .selector=${{ select: { options: ['0', '1'], mode: 'dropdown' } }}
-                .value=${String(this.config.decimals ?? 1)}
-                .label=${'Decimals'}
-                .configValue=${'decimals'}
-                @value-changed=${this.valueChanged}
-              ></ha-selector>
+              <ha-textfield
+                label="Decimals"
+                type="number"
+                min="0"
+                max="5"
+                .value="${String(this.config.decimals ?? 1)}"
+                .configValue="${'decimals'}"
+                @input="${this.valueChanged}"
+              ></ha-textfield>
               <ha-textfield
                 label="Unit (optional)"
                 .value="${this.config.unit ?? ''}"
@@ -184,8 +187,13 @@ export default class SimpleThermostatEditor extends LitElement {
               ></ha-selector>
               <ha-selector
                 .hass=${this.hass}
-                .selector=${{ select: { options: ['0.5', '1'], mode: 'dropdown' } }}
-                .value=${String(this.config.step_size ?? 0.5)}
+                .selector=${{ select: { options: [
+                  { value: '', label: 'Auto (from entity)' },
+                  { value: '0.1', label: '0.1' },
+                  { value: '0.5', label: '0.5' },
+                  { value: '1', label: '1' },
+                ], mode: 'dropdown' } }}
+                .value=${this.config.step_size != null ? String(this.config.step_size) : ''}
                 .label=${'Step size'}
                 .configValue=${'step_size'}
                 @value-changed=${this.valueChanged}
@@ -197,6 +205,91 @@ export default class SimpleThermostatEditor extends LitElement {
               .configValue="${'fallback'}"
               @input="${this.valueChanged}"
             ></ha-textfield>
+
+            <p class="section-label">Hide</p>
+            <div class="editor-switches">
+              <ha-formfield label="Hide temperature">
+                <ha-switch
+                  .checked=${this.config?.hide?.temperature === true}
+                  .configValue="${'hide.temperature'}"
+                  @change=${this.valueChanged}
+                ></ha-switch>
+              </ha-formfield>
+              <ha-formfield label="Hide state">
+                <ha-switch
+                  .checked=${this.config?.hide?.state === true}
+                  .configValue="${'hide.state'}"
+                  @change=${this.valueChanged}
+                ></ha-switch>
+              </ha-formfield>
+            </div>
+
+            <p class="section-label">Labels</p>
+            <div class="side-by-side">
+              <ha-textfield
+                label="Temperature label"
+                .value="${this.config?.label?.temperature ?? ''}"
+                .configValue="${'label.temperature'}"
+                @input="${this.valueChanged}"
+              ></ha-textfield>
+              <ha-textfield
+                label="State label"
+                .value="${this.config?.label?.state ?? ''}"
+                .configValue="${'label.state'}"
+                @input="${this.valueChanged}"
+              ></ha-textfield>
+            </div>
+
+            <p class="section-label">Sensors</p>
+            <div class="side-by-side">
+              <ha-selector
+                .hass=${this.hass}
+                .selector=${{ select: { options: ['table', 'list'], mode: 'dropdown' } }}
+                .value=${this.config?.layout?.sensors?.type ?? 'table'}
+                .label=${'Sensor layout'}
+                .configValue=${'layout.sensors.type'}
+                @value-changed=${this.valueChanged}
+              ></ha-selector>
+              <ha-formfield label="Show sensor labels">
+                <ha-switch
+                  .checked=${this.config?.layout?.sensors?.labels !== false}
+                  .configValue="${'layout.sensors.labels'}"
+                  @change=${this.valueChanged}
+                ></ha-switch>
+              </ha-formfield>
+            </div>
+          </div>
+        </ha-expansion-panel>
+
+        <ha-expansion-panel .header=${'Interactions'} outlined>
+          <div class="panel-content">
+            <p class="styles-hint">
+              Configure how the card responds to tap, hold, and double-tap on the temperature display.
+            </p>
+            <ha-selector
+              .hass=${this.hass}
+              .selector=${{ ui_action: { default_action: 'more-info' } }}
+              .value=${this.config?.tap_action ?? { action: 'more-info' }}
+              .label=${'Tap action'}
+              .configValue=${'tap_action'}
+              @value-changed=${this.valueChanged}
+            ></ha-selector>
+            <ha-selector
+              .hass=${this.hass}
+              .selector=${{ ui_action: { default_action: 'none' } }}
+              .value=${this.config?.hold_action ?? { action: 'none' }}
+              .label=${'Hold action'}
+              .configValue=${'hold_action'}
+              @value-changed=${this.valueChanged}
+            ></ha-selector>
+            <ha-selector
+              .hass=${this.hass}
+              .selector=${{ ui_action: { default_action: 'none' } }}
+              .value=${this.config?.double_tap_action ?? { action: 'none' }}
+              .label=${'Double tap action'}
+              .configValue=${'double_tap_action'}
+              @value-changed=${this.valueChanged}
+            ></ha-selector>
           </div>
         </ha-expansion-panel>
 
@@ -205,15 +298,17 @@ export default class SimpleThermostatEditor extends LitElement {
             <p class="styles-hint">
               Use <code>--st-*</code> variables or target any selector inside the card.
             </p>
-            <textarea
-              class="styles-textarea"
-              .value=${this.config.styles ?? ''}
-              placeholder="ha-card { --st-spacing: 8px; }"
-              rows="6"
-              spellcheck="false"
-              @input=${this.cssChanged}
-              @keydown=${this._handleCssKeydown}
-            ></textarea>
+            <div class="styles-editor">
+              <ha-code-editor
+                mode="yaml"
+                autocomplete-entities
+                autocomplete-icons
+                .hass=${this.hass}
+                .value=${this.config.styles ?? ''}
+                .configValue=${'styles'}
+                @value-changed=${this.valueChanged}
+              ></ha-code-editor>
+            </div>
           </div>
         </ha-expansion-panel>
 
@@ -223,8 +318,9 @@ export default class SimpleThermostatEditor extends LitElement {
             All configuration options
           </ha-button>
           <span class="editor-footer__hint">
-            Sensors, faults &amp; advanced options require the code editor
+            Advanced settings only via YAML
           </span>
+          <span class="editor-footer__version">v${version} · ${BUILD_TIME}</span>
         </div>
 
       </div>
@@ -252,46 +348,17 @@ export default class SimpleThermostatEditor extends LitElement {
         setValue(copy, target.configValue, value)
       }
     }
-    fireEvent(this, 'config-changed', { config: copy })
-  }
-
-  _handleCssKeydown(ev: KeyboardEvent) {
-    const ta = ev.target as HTMLTextAreaElement
-    const { selectionStart, selectionEnd, value } = ta
-    if (ev.key === 'Tab' && !ev.shiftKey) {
-      ev.preventDefault()
-      ta.value = value.substring(0, selectionStart) + '  ' + value.substring(selectionEnd)
-      ta.selectionStart = ta.selectionEnd = selectionStart + 2
-      ta.dispatchEvent(new Event('input', { bubbles: true }))
-    } else if (ev.key === 'Tab' && ev.shiftKey) {
-      ev.preventDefault()
-      const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1
-      const twoSpaces = value.substring(lineStart, lineStart + 2)
-      if (twoSpaces === '  ') {
-        ta.value = value.substring(0, lineStart) + value.substring(lineStart + 2)
-        ta.selectionStart = ta.selectionEnd = Math.max(lineStart, selectionStart - 2)
-        ta.dispatchEvent(new Event('input', { bubbles: true }))
+    // Auto-hide mode buttons when both names and icons are disabled
+    if (['layout.mode.names', 'layout.mode.icons'].includes(target.configValue)) {
+      const namesOff = copy?.layout?.mode?.names === false
+      const iconsOff = copy?.layout?.mode?.icons === false
+      if (namesOff && iconsOff) {
+        copy.control = false
+      } else if (copy.control === false) {
+        delete copy.control
       }
-    } else if (ev.key === 'Enter') {
-      ev.preventDefault()
-      const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1
-      const indent = value.substring(lineStart).match(/^(\s*)/)?.[1] ?? ''
-      const newText = '\n' + indent
-      ta.value = value.substring(0, selectionStart) + newText + value.substring(selectionEnd)
-      ta.selectionStart = ta.selectionEnd = selectionStart + newText.length
-      ta.dispatchEvent(new Event('input', { bubbles: true }))
     }
-  }
 
-  cssChanged(ev) {
-    if (!this.config || !this.hass) return
-    const copy = cloneDeep(this.config)
-    const value = ev.target.value ?? ''
-    if (!value) {
-      delete copy.styles
-    } else {
-      copy.styles = value
-    }
     fireEvent(this, 'config-changed', { config: copy })
   }
 

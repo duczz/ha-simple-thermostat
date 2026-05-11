@@ -28,7 +28,11 @@ This fork modernises [nervetattoo/simple-thermostat](https://github.com/nervetat
 - **Auto-entity selection** — `getStubConfig()` auto-picks the first `climate.*` entity in the HA card picker
 - **Custom CSS support** — native `styles:` config key; no card-mod required for per-card overrides
 - **Locale-aware number formatting** — temperature display respects the HA user's locale (comma vs. dot as decimal separator)
-- **Visual editor** — collapsible sections for Header, Mode Controls, Layout, and Custom CSS; all common options configurable without YAML
+- **Visual editor** — collapsible sections for Header, Mode Controls, Layout & Display (incl. Hide, Labels, Sensors), Interactions, and Custom CSS with syntax highlighting; all common options configurable without YAML
+- **Header toggle icon** — `header.toggle.icon` configurable in the visual editor
+- **Tap / hold / double-tap actions** — full HA-standard `tap_action`, `hold_action`, `double_tap_action` on the temperature display (more-info / none / navigate / url / toggle / call-service); configurable in the Interactions editor panel
+- **Loading state** — card shows a shimmering placeholder on first mount instead of a spurious "Entity not available" error
+- **Unavailable entity styling** — card is greyed out and non-interactive when the climate entity is `unavailable` or `unknown`
 - **Modern build tooling** — Node 24, updated Rollup/TypeScript/Jest plugins, `strictNullChecks` enabled, CI workflows
 
 ### Bug fixes
@@ -119,11 +123,13 @@ The card has a built-in visual editor accessible from the HA card picker (pencil
 | **Entity (required)** | The `climate.*` entity to control |
 | **Header** | Show/hide the card header; set a custom name and icon |
 | **Header → Toggle entity** | An optional entity (e.g. `input_boolean`, `switch`) shown as an on/off toggle inside the header |
-| **Header → Toggle label** | The text displayed next to the toggle switch, e.g. *"Boost"* or *"Night mode"* |
+| **Header → Toggle label / icon** | The text and icon displayed next to the toggle switch |
 | **Mode Controls** | Show or hide mode button names, icons, and section headings |
-| **Layout & Display** | Decimal places for the temperature, unit override, step size (how much ▲/▼ changes the setpoint), and step layout (buttons above/below vs. left/right) |
+| **Layout & Display** | Decimal places, unit override, step size, step layout, hide rows, and label overrides |
+| **Sensors** | Sensor layout type (list / table) and whether to show sensor labels |
+| **Interactions** | `tap_action`, `hold_action`, `double_tap_action` on the temperature display — same options as any HA card |
 | **Fallback text** | Text shown instead of "N/A" when the setpoint value is unavailable, e.g. `--` or `Offline` |
-| **Custom CSS** | Free-form CSS injected into the card's Shadow DOM — use `--st-*` variables or target any selector. No card-mod required |
+| **Custom CSS** | Syntax-highlighted CSS editor injected into the card's Shadow DOM — use `--st-*` variables or target any selector. No card-mod required |
 
 > **Tip:** Sensors, faults, and other advanced options can only be configured in the YAML (code) editor. Click **All configuration options** in the editor for the full reference.
 
@@ -150,11 +156,14 @@ entity: climate.my_room
 | `unit`       | `string\|false`       | —       | Override or hide the displayed unit |
 | `decimals`   | `number`              | `1`     | Number of decimal places |
 | `fallback`   | `string`              | `N/A`   | Text when no setpoint is available |
-| `step_size`  | `number`              | `0.5`   | Step for temperature up/down |
+| `step_size`  | `number`              | auto    | Step for temperature up/down; defaults to the entity's `target_temp_step` attribute |
 | `label`      | `object`              | —       | Override `temperature` / `state` labels |
 | `hide`       | `object`              | —       | `temperature: bool`, `state: bool` |
 | `control`    | `object\|array\|false`| —       | See [Control config](#control-config) |
 | `sensors`    | `array\|false`        | —       | See [Sensors config](#sensors-config) |
+| `tap_action` | `object`              | `more-info` | Action when tapping the temperature display |
+| `hold_action`| `object`              | `none`  | Action when holding the temperature display (500 ms) |
+| `double_tap_action`| `object`        | `none`  | Action when double-tapping the temperature display (250 ms) |
 | `styles`     | `string`              | —       | Custom CSS injected into the card — see [Custom CSS](#custom-css) |
 | `version`    | `2\|3`                | `2`     | Set to `3` to enable [Templated Sensors](#templated-sensors-version-3) |
 | `variables`  | `object`              | —       | Custom variables available in `version: 3` templates as `v.*` |
@@ -163,14 +172,14 @@ entity: climate.my_room
 
 ```yaml
 layout:
-  step: row        # row | column — where to render the +/- buttons
+  step: row        # row | column — where to render the +/- buttons (default: row)
   mode:
-    names: true    # show mode names
-    icons: true    # show mode icons
-    headings: true # show mode type headings
+    names: true    # show mode names (default: true)
+    icons: true    # show mode icons (default: true)
+    headings: false # show mode type headings (default: false)
   sensors:
-    type: list     # list | table
-    labels: true   # show sensor labels
+    type: table    # list | table (default: table)
+    labels: true   # show sensor labels (default: true)
 ```
 
 ---
@@ -186,6 +195,7 @@ header:
   toggle:
     entity: switch.pump_relay
     name: Pump
+    icon: mdi:water-pump   # optional icon next to the toggle label
   faults:
     - entity: binary_sensor.low_battery
       icon: mdi:battery-low
@@ -197,6 +207,9 @@ header:
 | `name`    | `string`         | Override the card name |
 | `icon`    | `string\|object` | Icon next to the name; pass an object to set per-state icons |
 | `toggle`  | `object`         | Entity id to show as a toggle in the header |
+| `toggle.entity` | `string`   | Entity id for the toggle (e.g. `switch.pump_relay`) |
+| `toggle.name`   | `string\|true` | Label next to the toggle; `true` uses the entity's friendly name |
+| `toggle.icon`   | `string\|false` | Icon next to the toggle label; `false` hides it (default) |
 | `faults`  | `array\|false`   | Binary sensor entities to show as fault indicators |
 
 Icon object keys: `auto`, `cooling`, `fan`, `heating`, `idle`, `off`, `cool`, `dry`, `fan_only`, `heat`, `heat_cool`
@@ -452,6 +465,10 @@ styles: |
 | `--st-font-size-toggle-label`| `16px`                                     | Toggle label font size |
 | `--st-fault-inactive-color`  | `var(--secondary-background-color)`        | Fault icon color when inactive |
 | `--st-fault-active-color`    | `var(--accent-color)`                      | Fault icon color when active |
+| `--st-mode-color`            | `var(--secondary-text-color)`              | Text color for inactive mode buttons |
+| `--st-mode-border-radius`    | `var(--ha-card-border-radius, 4px)`        | Border radius of mode buttons |
+| `--st-mode-transition`       | `200ms ease`                               | Transition speed for mode button color changes |
+| `--st-header-icon-color`     | `var(--state-icon-color, #44739e)`         | Color of the header icon |
 
 ### HA theme example
 
@@ -519,6 +536,6 @@ control: false
 [hacs-url]: https://hacs.xyz
 [ha-badge]: https://img.shields.io/badge/Home%20Assistant-2024.1+-41BDF5.svg?style=for-the-badge&logo=homeassistant&logoColor=white
 [ha-url]: https://www.home-assistant.io
-[version-badge]: https://img.shields.io/badge/version-2.3.0-22c55e.svg?style=for-the-badge&logo=github&logoColor=white
+[version-badge]: https://img.shields.io/badge/version-2.3.1-22c55e.svg?style=for-the-badge&logo=github&logoColor=white
 [release-url]: https://github.com/duczz/ha-simple-thermostat
 [license-badge]: https://img.shields.io/badge/license-MIT-94a3b8.svg?style=for-the-badge

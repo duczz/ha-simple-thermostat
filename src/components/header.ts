@@ -75,6 +75,9 @@ function renderToggle(toggle, openEntityPopover, toggleEntityChanged) {
 
   return html`
     <div class="header__toggle">
+      ${toggle.icon !== false
+        ? html`<ha-icon class="toggle-icon" .icon=${toggle.icon}></ha-icon>`
+        : nothing}
       <span
         class="clickable toggle-label"
         @click=${() => openEntityPopover(toggle.entity?.entity_id)}

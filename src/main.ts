@@ -1,4 +1,4 @@
-import { LitElement, html, nothing, PropertyValues } from 'lit'
+import { LitElement, html, nothing, PropertyValues, TemplateResult } from 'lit'
 import { state } from 'lit/decorators.js'
 import debounce from 'debounce-fn'
 import { name as CARD_NAME } from '../package.json'
@@ -17,7 +17,7 @@ import parseHeader, { HeaderData, MODE_ICONS } from './config/header'
 import parseSetpoints from './config/setpoints'
 import parseService, { Service } from './config/service'
 
-import { CardConfig, ModeValue, ModeControlObject, MODES } from './config/card'
+import { CardConfig, ModeValue, ModeControlObject, MODES, TapAction } from './config/card'
 
 import {
   ControlMode,
@@ -122,6 +122,15 @@ export default class SimpleThermostat extends LitElement {
   _updatingValuesTimeout: ReturnType<typeof setTimeout> | null = null
   _needsRecompute = true
 
+  // Action-handler state: detects tap vs hold vs double-tap on primary
+  // interaction targets (the temperature display / header)
+  _holdTimer: ReturnType<typeof setTimeout> | null = null
+  _holdFired = false
+  _clickCount = 0
+  _clickTimer: ReturnType<typeof setTimeout> | null = null
+  static HOLD_MS = 500
+  static DOUBLE_TAP_MS = 250
+
   _debouncedSetTemperature = debounce(
     (values: object) => {
       const { domain, service, data = {} } = this.service
@@ -154,7 +163,7 @@ export default class SimpleThermostat extends LitElement {
     const climateEntity = Object.keys(hass.states).find((id) =>
       id.startsWith('climate.')
     )
-    return { entity: climateEntity ?? 'climate.my_thermostat' }
+    return { entity: climateEntity ?? '' }
   }
 
   setConfig(config: CardConfig) {
@@ -174,6 +183,14 @@ export default class SimpleThermostat extends LitElement {
     if (this._updatingValuesTimeout) {
       clearTimeout(this._updatingValuesTimeout)
       this._updatingValuesTimeout = null
+    }
+    if (this._holdTimer) {
+      clearTimeout(this._holdTimer)
+      this._holdTimer = null
+    }
+    if (this._clickTimer) {
+      clearTimeout(this._clickTimer)
+      this._clickTimer = null
     }
     this._debouncedSetTemperature?.cancel?.()
   }
@@ -218,7 +235,11 @@ export default class SimpleThermostat extends LitElement {
     this._needsRecompute = false
     this.entity = entity
 
-    this.header = parseHeader(this.config.header, entity, hass)
+    this.header = parseHeader(
+      this.config.header === false ? false : (this.config.header ?? {}),
+      entity,
+      hass
+    )
 
     const attributes = entity.attributes
 
@@ -277,11 +298,12 @@ export default class SimpleThermostat extends LitElement {
 
     // Decorate mode types with active value and set to this.modes
     this.modes = controlModes.map((values) => {
+      const list = values.list ?? []
       if (values.type === MODES.HVAC) {
         const hvacModeValues = Object.values(HVAC_MODES) as Array<string>
         const known: Array<ControlModeOption> = []
         const unknown: Array<ControlModeOption> = []
-        values.list.forEach((item: ControlModeOption) => {
+        list.forEach((item: ControlModeOption) => {
           const index = hvacModeValues.indexOf(item.value)
           if (index >= 0) {
             known[index] = item
@@ -301,6 +323,8 @@ export default class SimpleThermostat extends LitElement {
 
     if (this.config.step_size) {
       this.stepSize = +this.config.step_size
+    } else if (attributes.target_temp_step) {
+      this.stepSize = +attributes.target_temp_step
     }
 
     this._hide = { ...DEFAULT_HIDE, ...this.config.hide }
@@ -315,19 +339,19 @@ export default class SimpleThermostat extends LitElement {
         const entityId = sensor?.entity ?? mainEntityId
         let context: LooseObject | undefined = entity
         if (sensor?.entity) {
-          context = this._hass.states[sensor.entity]
+          context = this._hass.states?.[sensor.entity]
         }
         return {
           id: sensor?.id ?? String(index),
           label: sensor?.label,
-          template: sensor.template,
+          template: sensor?.template ?? '',
           show: sensor?.show !== false,
           entityId,
           context,
         } as PreparedSensor
       })
       const ids = customSensors.map((s) => s.id)
-      const builtins = []
+      const builtins: Array<PreparedSensor> = []
       if (!ids.includes('state')) {
         builtins.push({
           id: 'state',
@@ -335,6 +359,7 @@ export default class SimpleThermostat extends LitElement {
           template: '{{state.text}}',
           entityId: mainEntityId,
           context: entity,
+          show: true,
         })
       }
       if (!ids.includes('temperature')) {
@@ -344,6 +369,7 @@ export default class SimpleThermostat extends LitElement {
           template: '{{current_temperature|formatNumber}}',
           entityId: mainEntityId,
           context: entity,
+          show: true,
         })
       }
       this.sensors = [...builtins, ...customSensors]
@@ -381,8 +407,9 @@ export default class SimpleThermostat extends LitElement {
     return this._hass.localize(key) || label
   }
 
-  render({ _hide, _values, _updatingValues, config, entity } = this) {
-    const warnings = []
+  render() {
+    const { _hide, _values, _updatingValues, config, entity } = this
+    const warnings: Array<TemplateResult> = []
     if (this.stepSize < 1 && this.config.decimals === 0) {
       warnings.push(html`
         <ha-alert alert-type="warning">
@@ -394,6 +421,12 @@ export default class SimpleThermostat extends LitElement {
     }
 
     if (!entity) {
+      // Distinguish "still loading" (hass not yet received) from
+      // "entity truly missing" so users don't see a spurious error
+      // during initial mount.
+      if (!this._hass?.states) {
+        return html`<ha-card class="loading"></ha-card>`
+      }
       return html`
         <ha-alert alert-type="error">
           Entity not available: ${config.entity}
@@ -414,7 +447,15 @@ export default class SimpleThermostat extends LitElement {
     const stepLayout = this.config?.layout?.step ?? 'row'
     const row = stepLayout === 'row'
 
-    const classes = [!this.header && 'no-header', action].filter((cx) => !!cx)
+    const isUnavailable = ['unavailable', 'unknown'].includes(entity.state)
+    // Sanitize entity-derived class values: only allow safe identifier chars
+    const safeClass = (v: unknown) =>
+      typeof v === 'string' ? v.replace(/[^a-z0-9_-]/gi, '') : ''
+    const classes = [
+      !this.header && 'no-header',
+      safeClass(action),
+      isUnavailable && safeClass(entity.state),
+    ].filter((cx) => !!cx)
 
     let sensorsHtml
     if (this.config.version === 3) {
@@ -477,11 +518,14 @@ export default class SimpleThermostat extends LitElement {
                 </ha-icon-button>
 
                 <h3
-                  @click=${() => this.openEntityPopover()}
+                  @pointerdown=${this._onActionPointerDown}
+                  @pointerup=${this._onActionPointerUp}
+                  @pointercancel=${this._onActionPointerUp}
+                  @click=${this._onActionClick}
                   @keydown=${(e: KeyboardEvent) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
-                      this.openEntityPopover()
+                      this._dispatchAction('tap')
                     }
                   }}
                   role="button"
@@ -526,12 +570,12 @@ export default class SimpleThermostat extends LitElement {
   }
 
   toggleEntityChanged = (ev: Event) => {
-    if (!this.header?.toggle) return
+    if (!this.header || !this.header.toggle) return
 
     const el = ev.target as HTMLInputElement
     this._callAction(
       el.checked ? 'homeassistant.turn_on' : 'homeassistant.turn_off',
-      { entity_id: this.header?.toggle?.entity?.entity_id }
+      { entity_id: this.header.toggle.entity?.entity_id }
     )
   }
 
@@ -571,6 +615,77 @@ export default class SimpleThermostat extends LitElement {
     })
   }
 
+  _onActionPointerDown = (e: PointerEvent) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return
+    this._holdFired = false
+    if (this._holdTimer) clearTimeout(this._holdTimer)
+    this._holdTimer = setTimeout(() => {
+      this._holdFired = true
+      this._holdTimer = null
+      this._dispatchAction('hold')
+    }, SimpleThermostat.HOLD_MS)
+  }
+
+  _onActionPointerUp = () => {
+    if (this._holdTimer) {
+      clearTimeout(this._holdTimer)
+      this._holdTimer = null
+    }
+  }
+
+  _onActionClick = (e: MouseEvent) => {
+    e.preventDefault()
+    if (this._holdFired) {
+      this._holdFired = false
+      return
+    }
+    this._clickCount += 1
+    if (this._clickCount === 1) {
+      if (this._clickTimer) clearTimeout(this._clickTimer)
+      this._clickTimer = setTimeout(() => {
+        this._clickCount = 0
+        this._clickTimer = null
+        this._dispatchAction('tap')
+      }, SimpleThermostat.DOUBLE_TAP_MS)
+    } else {
+      if (this._clickTimer) clearTimeout(this._clickTimer)
+      this._clickTimer = null
+      this._clickCount = 0
+      this._dispatchAction('double_tap')
+    }
+  }
+
+  _dispatchAction(kind: 'tap' | 'hold' | 'double_tap') {
+    const key = kind === 'tap' ? 'tap_action' : kind === 'hold' ? 'hold_action' : 'double_tap_action'
+    const action = this.config?.[key] ?? (kind === 'tap' ? { action: 'more-info' } : { action: 'none' })
+    this._runAction(action as TapAction)
+  }
+
+  _runAction(action: TapAction) {
+    switch (action.action) {
+      case 'none':
+        return
+      case 'more-info':
+        fireEvent(this, 'hass-more-info', { entityId: this.config.entity })
+        return
+      case 'navigate':
+        history.pushState(null, '', action.navigation_path)
+        fireEvent(window, 'location-changed', { replace: false })
+        return
+      case 'url':
+        window.open(action.url_path)
+        return
+      case 'toggle':
+        this._callAction('homeassistant.toggle', {
+          entity_id: this.config.entity,
+        })
+        return
+      case 'call-service':
+        this._callAction(action.service, action.service_data ?? {})
+        return
+    }
+  }
+
   getCardSize() {
     let size = 2 // temperature display + sensors row
     if (this.config?.header !== false) size += 1
@@ -578,7 +693,7 @@ export default class SimpleThermostat extends LitElement {
     return size
   }
 
-  getUnit(): string | boolean {
+getUnit(): string | boolean {
     if (this.config.unit !== undefined) {
       return this.config.unit
     }
