@@ -200,9 +200,8 @@ header {
   cursor: pointer;
 }
 .modes {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   margin-top: calc(var(--st-spacing, var(--st-default-spacing)) * 2);
   padding: var(--st-spacing, var(--st-default-spacing))
@@ -221,6 +220,8 @@ header {
   white-space: nowrap;
 }
 .mode-item {
+  flex: 1;
+  min-width: max-content;
   display: flex;
   flex-direction: row;
   align-items: center;

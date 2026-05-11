@@ -79,7 +79,7 @@ function getModeList(
           ? specification[modeOption]
           : ({} as {})
       return {
-        icon: MODE_ICONS[modeOption],
+        icon: MODE_ICONS[modeOption] ?? MODE_ICONS[modeOption.toLowerCase()],
         value: modeOption,
         name: modeOption,
         ...values,

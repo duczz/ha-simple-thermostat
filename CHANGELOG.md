@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.2 - Unreleased]
+
+### 🎨 Design Polish
+
+- **Mode buttons wrap** — Buttons now wrap to the next line instead of overflowing the card when there are too many modes
+- **More mode icons** — Added icons for `normal`, `powerful`, `silent` fan modes; icon lookup is now case-insensitive so modes like `Quiet` or `Normal` (capitalised by the integration) also get icons
+
 ## [2.3.1] – 2026-05-11
 
 ### ✨ Improvements

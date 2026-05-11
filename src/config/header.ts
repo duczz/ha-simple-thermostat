@@ -43,11 +43,15 @@ export const MODE_ICONS = {
   activity: 'mdi:run',
   // Fan modes
   on: 'mdi:fan',
+  auto: 'mdi:fan-auto',
+  normal: 'mdi:fan',
   low: 'mdi:fan-speed-1',
   medium: 'mdi:fan-speed-2',
   high: 'mdi:fan-speed-3',
   turbo: 'mdi:fan-alert',
+  powerful: 'mdi:fan-plus',
   quiet: 'mdi:fan-minus',
+  silent: 'mdi:fan-minus',
   // Swing modes
   vertical: 'mdi:arrow-up-down',
   horizontal: 'mdi:arrow-left-right',
