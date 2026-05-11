@@ -23,7 +23,7 @@ jobs:
         run: npm run build
 
       - name: Prepare for HACS validation
-        run: cp dist/ha-simple-thermostat.js .
+        run: cp dist/simple-thermostat.js .
 
       - name: HACS validation
         uses: hacs/action@main
