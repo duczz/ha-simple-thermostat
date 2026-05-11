@@ -34,6 +34,5 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "chore: build dist [skip ci]"
-            git pull --rebase origin master
-            git push origin master
+            git push origin HEAD:master
           fi
