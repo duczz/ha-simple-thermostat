@@ -2,6 +2,10 @@
 
 ## [2.3.2 - Unreleased]
 
+### ⚠️ Breaking Changes
+
+- **Resource URL changed** — The built file was renamed from `ha-simple-thermostat.js` to `simple-thermostat.js`. Update your Lovelace resource from `/hacsfiles/ha-simple-thermostat/ha-simple-thermostat.js` to `/hacsfiles/ha-simple-thermostat/simple-thermostat.js`
+
 ### 🎨 Design Polish
 
 - **Mode buttons wrap** — Buttons now wrap to the next line instead of overflowing the card when there are too many modes
