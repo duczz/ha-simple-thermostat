@@ -50,10 +50,12 @@ export default function renderTemplated({
   const { state, attributes } = context
 
   const [domain] = entityId.split('.')
-  const trPrefix = 'ui.card.climate.'
+  const uiPrefix = ['climate', 'fan', 'humidifier'].includes(domain)
+    ? `ui.card.${domain}.`
+    : 'ui.card.climate.'
   const uiKeys = ['currently', 'operation', 'fan_mode', 'swing_mode', 'preset_mode', 'humidity']
   const translations = Object.fromEntries(
-    uiKeys.map((key) => [key, hass.localize?.(`${trPrefix}${key}`) ?? key])
+    uiKeys.map((key) => [key, hass.localize?.(`${uiPrefix}${key}`) ?? key])
   )
 
   // Prepare data to inject as variables into the template

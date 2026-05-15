@@ -16,6 +16,7 @@ import renderModeType from './components/modeType'
 import parseHeader, { HeaderData, MODE_ICONS } from './config/header'
 import parseSetpoints from './config/setpoints'
 import parseService, { Service } from './config/service'
+import { getAdapter } from './adapters'
 
 import { CardConfig, ModeValue, ModeControlObject, MODES, TapAction } from './config/card'
 
@@ -69,19 +70,29 @@ function shouldShowModeControl(
 function getModeList(
   type: string,
   attributes: LooseObject,
-  specification: Partial<ModeControlObject> = {}
+  specification: Partial<ModeControlObject> = {},
+  modeAttribute: string = `${type}_modes`
 ) {
-  return attributes[`${type}_modes`]
+  let modeOptions = attributes[modeAttribute]
+  // Handle boolean attributes (e.g. fan oscillating)
+  if (typeof modeOptions === 'boolean') {
+    modeOptions = ['false', 'true']
+  }
+  if (!Array.isArray(modeOptions)) {
+    return []
+  }
+  return modeOptions
     .filter((modeOption) => shouldShowModeControl(modeOption, specification))
     .map((modeOption) => {
+      const modeKey = String(modeOption)
       const values =
-        typeof specification[modeOption] === 'object'
-          ? specification[modeOption]
+        typeof specification[modeKey] === 'object'
+          ? specification[modeKey]
           : ({} as {})
       return {
-        icon: MODE_ICONS[modeOption] ?? MODE_ICONS[modeOption.toLowerCase()],
-        value: modeOption,
-        name: modeOption,
+        icon: MODE_ICONS[modeKey] ?? MODE_ICONS[modeKey.toLowerCase()],
+        value: modeKey,
+        name: modeKey,
         ...values,
       }
     })
@@ -121,6 +132,7 @@ export default class SimpleThermostat extends LitElement {
 
   _updatingValuesTimeout: ReturnType<typeof setTimeout> | null = null
   _needsRecompute = true
+  _extTempEntity: any = null
 
   // Action-handler state: detects tap vs hold vs double-tap on primary
   // interaction targets (the temperature display / header)
@@ -160,10 +172,13 @@ export default class SimpleThermostat extends LitElement {
   }
 
   static getStubConfig(hass: any) {
-    const climateEntity = Object.keys(hass.states).find((id) =>
-      id.startsWith('climate.')
+    const entity = Object.keys(hass.states).find(
+      (id) =>
+        id.startsWith('climate.') ||
+        id.startsWith('fan.') ||
+        id.startsWith('humidifier.')
     )
-    return { entity: climateEntity ?? '' }
+    return { entity: entity ?? '' }
   }
 
   setConfig(config: CardConfig) {
@@ -174,7 +189,7 @@ export default class SimpleThermostat extends LitElement {
       decimals: DECIMALS,
       ...config,
     }
-    this.service = parseService(this.config.service ?? false)
+    this.service = parseService(this.config.service ?? false, getAdapter(this.config.entity))
     this._needsRecompute = true
   }
 
@@ -229,9 +244,18 @@ export default class SimpleThermostat extends LitElement {
     // Short-circuit: skip full recompute when neither entity nor config changed.
     // entity objects in hass.states are replaced by reference on every HA update
     // for the specific entity that changed, so === is a reliable change check.
-    if (this.entity === entity && !this._needsRecompute) {
+    // Also track external temperature entity if configured.
+    const extTempId =
+      this.config.current_value_entity ?? this.config.current_temperature_entity
+    const extTempEntity = extTempId ? hass.states[extTempId] : null
+    if (
+      this.entity === entity &&
+      this._extTempEntity === extTempEntity &&
+      !this._needsRecompute
+    ) {
       return
     }
+    this._extTempEntity = extTempEntity
     this._needsRecompute = false
     this.entity = entity
 
@@ -242,8 +266,9 @@ export default class SimpleThermostat extends LitElement {
     )
 
     const attributes = entity.attributes
+    const adapter = getAdapter(this.config.entity)
 
-    let values = parseSetpoints(this.config.setpoints, attributes)
+    let values = parseSetpoints(this.config.setpoints, attributes, adapter)
 
     // If we are updating the values, and they are now equal
     // we can safely assume we've been able to update the set points
@@ -260,13 +285,14 @@ export default class SimpleThermostat extends LitElement {
       this._values = values
     }
 
+    const defaultControl = adapter.getDefaultControl()
     const supportedModeType = (type: string) =>
-      MODE_TYPES.includes(type) && attributes[`${type}_modes`]
+      attributes[adapter.getModeAttribute(type)] !== undefined
     const buildBasicModes = (items: any) => {
       return items.filter(supportedModeType).map((type: string) => ({
         type,
         hide_when_off: false,
-        list: getModeList(type, attributes),
+        list: getModeList(type, attributes, {}, adapter.getModeAttribute(type)),
       }))
     }
 
@@ -286,14 +312,14 @@ export default class SimpleThermostat extends LitElement {
               type,
               hide_when_off: _hide_when_off,
               name: _name,
-              list: getModeList(type, attributes, controlField),
+              list: getModeList(type, attributes, controlField, adapter.getModeAttribute(type)),
             }
           })
       } else {
-        controlModes = buildBasicModes(DEFAULT_CONTROL)
+        controlModes = buildBasicModes(defaultControl)
       }
     } else {
-      controlModes = buildBasicModes(DEFAULT_CONTROL)
+      controlModes = buildBasicModes(defaultControl)
     }
 
     // Decorate mode types with active value and set to this.modes
@@ -317,14 +343,17 @@ export default class SimpleThermostat extends LitElement {
           mode: entity.state,
         } as ControlMode
       }
-      const mode = attributes[`${values.type}_mode`]
-      return { ...values, mode } as ControlMode
+      const mode = attributes[adapter.getModePayloadKey(values.type!)]
+      return { ...values, mode: String(mode) } as ControlMode
     })
 
     if (this.config.step_size) {
       this.stepSize = +this.config.step_size
-    } else if (attributes.target_temp_step) {
-      this.stepSize = +attributes.target_temp_step
+    } else {
+      const adapterStep = adapter.getRange(attributes).step
+      if (adapterStep != null) {
+        this.stepSize = +adapterStep
+      }
     }
 
     this._hide = { ...DEFAULT_HIDE, ...this.config.hide }
@@ -363,19 +392,27 @@ export default class SimpleThermostat extends LitElement {
         })
       }
       if (!ids.includes('temperature')) {
+        const tempEntityId =
+          this.config.current_value_entity ??
+          this.config.current_temperature_entity ??
+          mainEntityId
+        const useExternalTemp =
+          tempEntityId !== mainEntityId && hass.states[tempEntityId]
         builtins.push({
           id: 'temperature',
           label: '{{ui.currently}}',
-          template: '{{current_temperature|formatNumber}}',
-          entityId: mainEntityId,
-          context: entity,
+          template: useExternalTemp
+            ? '{{state.raw|formatNumber}}'
+            : adapter.getCurrentValueTemplate(),
+          entityId: tempEntityId,
+          context: useExternalTemp ? hass.states[tempEntityId] : entity,
           show: true,
         })
       }
       this.sensors = [...builtins, ...customSensors]
     } else if (this.config.sensors) {
       this.sensors = this.config.sensors.map(
-        ({ name, entity: sensorEntity, attribute, unit = '', ...rest }) => {
+        ({ name, entity: sensorEntity, attribute, unit, ...rest }) => {
           let state
           const names = [name]
           if (sensorEntity) {
@@ -435,12 +472,11 @@ export default class SimpleThermostat extends LitElement {
     }
 
     const {
-      attributes: {
-        min_temp: minTemp = null,
-        max_temp: maxTemp = null,
-        hvac_action: action,
-      },
+      attributes: { hvac_action: action },
     } = entity
+
+    const renderAdapter = getAdapter(this.config.entity)
+    const { min: minTemp, max: maxTemp } = renderAdapter.getRange(entity.attributes)
 
     const unit = this.getUnit()
 
@@ -599,9 +635,13 @@ export default class SimpleThermostat extends LitElement {
 
   setMode = (type: string, mode: string) => {
     if (type && mode) {
-      this._callAction(`climate.set_${type}_mode`, {
+      const adapter = getAdapter(this.config.entity)
+      const payloadValue = adapter.transformModePayloadValue
+        ? adapter.transformModePayloadValue(type, mode)
+        : mode
+      this._callAction(adapter.getModeService(type), {
         entity_id: this.config.entity,
-        [`${type}_mode`]: mode,
+        [adapter.getModePayloadKey(type)]: payloadValue,
       })
       fireEvent(this, 'haptic', 'light')
     } else {

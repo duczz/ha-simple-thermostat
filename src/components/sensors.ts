@@ -2,6 +2,7 @@ import { html } from 'lit'
 import formatNumber from '../formatNumber'
 import renderInfoItem from './infoItem'
 import { wrapSensors } from './templated'
+import { getAdapter } from '../adapters'
 
 export default function renderSensors({
   _hide,
@@ -15,19 +16,29 @@ export default function renderSensors({
 }) {
   const {
     state,
-    attributes: { hvac_action: action, current_temperature: current },
+    attributes: { hvac_action: action },
   } = entity
 
+  const adapter = getAdapter(config?.entity)
+  const adapterCurrent = adapter.getCurrentValue(entity.attributes)
+
+  // External temperature entity override (e.g. a room thermometer)
+  const extTempId =
+    config?.current_value_entity ?? config?.current_temperature_entity
+  const extTempState = extTempId ? hass.states?.[extTempId]?.state : undefined
+  const current = extTempState !== undefined ? extTempState : adapterCurrent
+
   const showLabels = config?.layout?.sensors?.labels ?? true
+  const domain = adapter.getLocalizationDomain()
   let stateString =
     hass.formatEntityState?.(entity) ??
-    localize(state, 'component.climate.state._.')
+    localize(state, `component.${domain}.state._.`)
   if (action) {
     const actionLabel =
       localize(
         action,
-        'component.climate.entity_component._.state_attributes.hvac_action.state.'
-      ) || localize(action, 'state_attributes.climate.hvac_action.')
+        `component.${domain}.entity_component._.state_attributes.hvac_action.state.`
+      ) || localize(action, `state_attributes.${domain}.hvac_action.`)
     stateString = [actionLabel, ` (${stateString})`].join('')
   }
   const sensorHtml = [
@@ -37,7 +48,7 @@ export default function renderSensors({
       hass,
       details: {
         heading: showLabels
-          ? config?.label?.temperature ?? localize('ui.card.climate.currently')
+          ? config?.label?.temperature ?? localize(`ui.card.${domain}.currently`)
           : false,
       },
     }),

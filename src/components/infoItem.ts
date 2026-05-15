@@ -50,23 +50,43 @@ export default function renderInfoItem({
       state.attributes?.device_class ?? '_',
       '',
     ].join('.')
-    const haFormatted = hass.formatEntityState?.(state)
-    let value = haFormatted ?? localize?.(state.state, prefix) ?? state.state
-    if (!haFormatted && typeof decimals === 'number') {
-      value = formatNumber(value, { decimals })
+    let value
+    let displayUnit = ''
+
+    if (unit !== undefined) {
+      // Custom unit provided: use raw state to prevent HA's native format from adding the native unit
+      let rawState = state.state
+      if (typeof decimals === 'number') {
+        rawState = formatNumber(rawState, { decimals })
+      }
+      value = rawState
+      displayUnit = unit ? ` ${unit}` : '' // Allows overriding to empty string to hide unit
+    } else {
+      // No custom unit: use HA's native formatting which includes localized native units
+      const haFormatted = hass.formatEntityState?.(state)
+      value = haFormatted ?? localize?.(state.state, prefix) ?? state.state
+      if (!haFormatted) {
+        if (typeof decimals === 'number') {
+          value = formatNumber(value, { decimals })
+        }
+        // Only append native unit manually if formatEntityState was not available
+        displayUnit = state.attributes?.unit_of_measurement ? ` ${state.attributes.unit_of_measurement}` : ''
+      }
     }
+
     valueCell = html`
       <div
         class="sensor-value clickable"
         @click="${() => openEntityPopover?.(state.entity_id)}"
       >
-        ${value} ${unit || state.attributes?.unit_of_measurement || ''}
+        ${value}${displayUnit}
       </div>
     `
   } else {
     let value =
       typeof decimals === 'number' ? formatNumber(state, { decimals }) : state
-    valueCell = html` <div class="sensor-value">${value}${unit}</div> `
+    const displayUnit = unit ? ` ${unit}` : ''
+    valueCell = html` <div class="sensor-value">${value}${displayUnit}</div> `
   }
 
   if (heading === false) {

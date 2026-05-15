@@ -1,17 +1,33 @@
 # Changelog
 
-## [2.3.2 - Unreleased]
+## [2.3.2] – 2026-05-15
+
+### ✨ Improvements
+
+- **Fan entity support** — The card can now control `fan.*` entities: percentage slider, preset/direction/oscillating mode buttons (`fan.set_percentage`, `fan.set_preset_mode`, `fan.set_direction`, `fan.oscillate`)
+- **Humidifier entity support** — The card can now control `humidifier.*` entities: humidity slider, mode buttons (`humidifier.set_humidity`, `humidifier.set_mode`)
+- **Entity adapter architecture** — Climate-specific logic (setpoints, ranges, services, modes, localization keys) is now isolated in domain adapters (`src/adapters/climate.ts`, `fan.ts`, `humidifier.ts`). Adding new domains in the future is mostly writing one adapter file
+- **Separate current temperature entity** — New `current_value_entity` config option lets you use a different entity (e.g. a room thermometer) for the displayed current temperature. Configurable directly in the visual editor; legacy `current_temperature_entity` kept as fallback
+- **Editor: Mode type toggles** — New toggles in *Mode Controls* to show/hide `preset`, `fan`, and `swing` mode buttons without YAML
+- **Editor: multi-domain entity picker** — Entity selector now accepts `climate.*`, `fan.*`, and `humidifier.*` entities; `getStubConfig` auto-picks the first matching entity in any of those domains
+- **Editor: migrated to `ha-form`** — Editor now uses HA's standard `ha-form` for all standard fields (consistent label rendering, future-proof). `ha-textfield` is deprecated and being removed by HA in 2026.5; the new editor uses `ha-input` / `ha-selector` under the hood. Custom CSS stays in its own `ha-code-editor` panel
+- **Header panel collapsed by default** — Like the other sections, *Header* now starts collapsed in the editor for a less cluttered initial view
+- **Extended mode icons** — Added icons for `automatic` fan mode; numbered fan speeds `1`–`5`; extended swing position icons (`top`, `middle`, `bottom`, `left`, `center`, `right`, etc.)
+
+### 🐛 Bug Fixes
+
+- **Mode list crash on non-array `*_modes`** — `getModeList` now guards against `attributes[type + '_modes']` being absent or non-iterable
+- **Boolean/numeric mode values** — `getModeList` now coerces mode values to strings (e.g. numeric fan speeds `1`–`5` or boolean oscillating values) so icon lookup and button rendering work for any entity-provided value
+- **Duplicate icon keys** — Removed duplicate `auto` and `off` keys in `MODE_ICONS` that were silently overriding each other; `auto` now consistently maps to `mdi:fan-auto` and `off` to `mdi:power`
+- **`current_value_entity` ignored in v2 sensors** — Default sensor renderer (`version: 2`) read `current_temperature` directly from the climate entity, bypassing the configured override; now uses the external sensor's state when set
+- **External temp entity not live-updating** — The hass-update short-circuit only compared the main climate entity; now also tracks the external temperature entity so its state changes refresh the displayed value
+- **Entity selector clear** — `valueChanged` now treats `null` as empty (alongside `''` and `undefined`) so clearing an entity field via HA's selector correctly deletes the config key instead of storing `null`
+
+## [2.3.1] – 2026-05-11
 
 ### ⚠️ Breaking Changes
 
 - **Resource URL changed** — The built file was renamed from `ha-simple-thermostat.js` to `simple-thermostat.js`. The easiest fix is to **reinstall via HACS** — this automatically sets the correct resource URL. If you prefer to update manually, change your Lovelace resource from `/hacsfiles/ha-simple-thermostat/ha-simple-thermostat.js` to `/hacsfiles/ha-simple-thermostat/simple-thermostat.js`
-
-### 🎨 Design Polish
-
-- **Mode buttons wrap** — Buttons now wrap to the next line instead of overflowing the card when there are too many modes
-- **More mode icons** — Added icons for `normal`, `powerful`, `silent` fan modes; icon lookup is now case-insensitive so modes like `Quiet` or `Normal` (capitalised by the integration) also get icons
-
-## [2.3.1] – 2026-05-11
 
 ### ✨ Improvements
 
@@ -44,6 +60,7 @@
 - **Horizontal alignment** — Mode button row now uses the same horizontal padding (`16px`) as the header and body, so all rows are visually aligned to the same left/right boundary
 - **Mode headings hidden by default** — `layout.mode.headings` now defaults to `false`; opt-in via config or editor
 - **Toggle icon styling** — Added explicit margin and size for the header toggle icon to align with the label
+- **Mode buttons wrap** — Buttons now wrap to the next line instead of overflowing the card when there are too many modes
 
 ### 🐛 Bug Fixes
 
@@ -51,6 +68,8 @@
 - **`getStubConfig` fallback entity** — No longer falls back to the literal string `climate.my_thermostat` when no climate entity exists; returns an empty entity picker instead
 - **Editor render crash on early mount** — `render()` now guards against `this.config` being undefined before `setConfig()` is called
 - **CSS class injection from `hvac_action`** — Entity-derived class values are now sanitized (only `[a-z0-9_-]`) before being applied to `ha-card`, preventing weird values from integrations from breaking CSS selectors
+- **Missing fan mode icons** — Added icons for `normal`, `powerful`, `silent` fan modes; icon lookup is now case-insensitive so modes like `Quiet` or `Normal` (capitalised by the integration) also get icons
+- **Step size dropdown empty** — Dropdown now correctly shows `Auto (from entity)` when no `step_size` is configured
 
 ### 🔧 Code quality
 
@@ -64,6 +83,7 @@
 - **GitHub Release workflow** — Added automated release workflow via GitHub Actions
 - **Repository URLs** — Updated `hacs.json` and `package.json` with the new repository location
 - **Artifact name** — Built file is `simple-thermostat.js` (matches the original fork)
+- **`hacs.json` filename field** — Added explicit `filename: simple-thermostat.js` so HACS sets the correct Lovelace resource URL on fresh installs
 
 
 ## [2.3.0] – 2026-05-07

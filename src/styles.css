@@ -293,7 +293,7 @@ header {
 }
 .side-by-side {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 8px;
   margin-bottom: 8px;
 }
@@ -363,9 +363,12 @@ header {
   border-radius: 4px;
   overflow: hidden;
   background: var(--code-editor-background-color, var(--card-background-color));
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
 }
 .styles-editor ha-code-editor {
   display: block;
-  min-height: 140px;
+  flex: 1;
   --code-mirror-max-height: 360px;
 }

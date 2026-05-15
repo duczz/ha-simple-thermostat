@@ -25,13 +25,13 @@ export const STATE_ICONS = {
 
 export const MODE_ICONS = {
   // HVAC modes
-  auto: 'hass:autorenew',
+  auto: 'mdi:fan-auto',
   cool: 'hass:snowflake',
   dry: 'hass:water-percent',
   fan_only: 'hass:fan',
   heat_cool: 'hass:autorenew',
   heat: 'hass:fire',
-  off: 'hass:power',
+  off: 'mdi:power',
   // Preset modes
   none: 'mdi:minus-circle-outline',
   eco: 'mdi:leaf',
@@ -43,7 +43,7 @@ export const MODE_ICONS = {
   activity: 'mdi:run',
   // Fan modes
   on: 'mdi:fan',
-  auto: 'mdi:fan-auto',
+  automatic: 'mdi:fan-auto',
   normal: 'mdi:fan',
   low: 'mdi:fan-speed-1',
   medium: 'mdi:fan-speed-2',
@@ -52,12 +52,30 @@ export const MODE_ICONS = {
   powerful: 'mdi:fan-plus',
   quiet: 'mdi:fan-minus',
   silent: 'mdi:fan-minus',
-  // Swing modes
+  // Fan speed numbers
+  '1': 'mdi:fan-speed-1',
+  '2': 'mdi:fan-speed-2',
+  '3': 'mdi:fan-speed-3',
+  '4': 'mdi:fan-plus',
+  '5': 'mdi:fan-alert',
+  // Swing modes — vertical positions
   vertical: 'mdi:arrow-up-down',
-  horizontal: 'mdi:arrow-left-right',
-  both: 'mdi:arrow-all',
+  top: 'mdi:arrow-up',
+  'top-middle': 'mdi:arrow-top-right',
+  middle: 'mdi:arrow-collapse-vertical',
+  'middle-bottom': 'mdi:arrow-bottom-right',
+  bottom: 'mdi:arrow-down',
   upper: 'mdi:arrow-up',
   lower: 'mdi:arrow-down',
+  // Swing modes — horizontal positions
+  horizontal: 'mdi:arrow-left-right',
+  left: 'mdi:arrow-left',
+  'center-left': 'mdi:arrow-top-left',
+  center: 'mdi:arrow-collapse-horizontal',
+  'center-right': 'mdi:arrow-top-right',
+  right: 'mdi:arrow-right',
+  // Swing modes — combined
+  both: 'mdi:arrow-all',
 }
 
 type Icon = string | false | LooseObject

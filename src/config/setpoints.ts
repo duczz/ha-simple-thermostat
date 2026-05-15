@@ -1,4 +1,5 @@
-import getEntityType, { DUAL } from '../getEntityType'
+import { EntityAdapter } from '../adapters/types'
+import { climateAdapter } from '../adapters/climate'
 
 export interface Setpoint {
   hide?: boolean
@@ -8,7 +9,8 @@ export type Setpoints = Record<string, Setpoint>
 
 export default function parseSetpoints(
   setpoints: Setpoints | false | undefined,
-  attributes: any
+  attributes: any,
+  adapter: EntityAdapter = climateAdapter
 ) {
   if (setpoints === false) {
     return {}
@@ -22,13 +24,5 @@ export default function parseSetpoints(
     }, {} as Record<string, any>)
   }
 
-  if (getEntityType(attributes) === DUAL) {
-    return {
-      target_temp_low: attributes.target_temp_low,
-      target_temp_high: attributes.target_temp_high,
-    }
-  }
-  return {
-    temperature: attributes.temperature,
-  }
+  return adapter.getSetpoints(attributes)
 }

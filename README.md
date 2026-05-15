@@ -22,10 +22,12 @@ This is a fork of [nervetattoo/simple-thermostat](https://github.com/nervetattoo
 This fork modernises [nervetattoo/simple-thermostat](https://github.com/nervetattoo/simple-thermostat) for current Home Assistant versions:
 
 ### Modernisation
+- **Multi-domain support** — Works with `climate.*`, `fan.*`, and `humidifier.*` entities. The card auto-detects the entity type and adapts setpoints, modes, and service calls (temperature/percentage/humidity) accordingly
+- **Separate current temperature entity** — `current_value_entity` lets you display the temperature from a different sensor (e.g. a room thermometer) instead of the thermostat's internal sensor
 - **Lit 3 migration** — fully compatible with HA 2024.1+
-- **Modern HA components** — `ha-textfield`, `ha-select`, `ha-alert`, `ha-icon-picker` replace removed Polymer elements
+- **`ha-form` based editor** — Visual editor uses Home Assistant's standard form renderer for consistent labels and future-proofing against HA's deprecation of `ha-textfield`
 - **Modern HA APIs** — `hass.performAction()` (HA 2024.8+), `hass.formatEntityState()` (HA 2022.6+), `hass.localize()` — all with graceful fallback to older APIs
-- **Auto-entity selection** — `getStubConfig()` auto-picks the first `climate.*` entity in the HA card picker
+- **Auto-entity selection** — `getStubConfig()` auto-picks the first available `climate.*`, `fan.*`, or `humidifier.*` entity in the HA card picker
 - **Custom CSS support** — native `styles:` config key; no card-mod required for per-card overrides
 - **Locale-aware number formatting** — temperature display respects the HA user's locale (comma vs. dot as decimal separator)
 - **Visual editor** — collapsible sections for Header, Mode Controls, Layout & Display (incl. Hide, Labels, Sensors), Interactions, and Custom CSS with syntax highlighting; all common options configurable without YAML
@@ -121,10 +123,12 @@ The card has a built-in visual editor accessible from the HA card picker (pencil
 | Section | What it does |
 |---|---|
 | **Entity (required)** | The `climate.*` entity to control |
+| **Current temperature entity (optional)** | Override the displayed current temperature with a separate sensor (e.g. a room thermometer) |
 | **Header** | Show/hide the card header; set a custom name and icon |
 | **Header → Toggle entity** | An optional entity (e.g. `input_boolean`, `switch`) shown as an on/off toggle inside the header |
 | **Header → Toggle label / icon** | The text and icon displayed next to the toggle switch |
-| **Mode Controls** | Show or hide mode button names, icons, and section headings |
+| **Mode Controls → Visible mode types** | Toggles to show/hide `preset`, `fan`, and `swing` mode button rows |
+| **Mode Controls → Display** | Show or hide mode button names, icons, and section headings |
 | **Layout & Display** | Decimal places, unit override, step size, step layout, hide rows, and label overrides |
 | **Sensors** | Sensor layout type (list / table) and whether to show sensor labels |
 | **Interactions** | `tap_action`, `hold_action`, `double_tap_action` on the temperature display — same options as any HA card |
@@ -144,11 +148,34 @@ type: custom:simple-thermostat
 entity: climate.my_room
 ```
 
+Use a separate sensor for the displayed current temperature (e.g. a room thermometer instead of the thermostat's internal sensor):
+
+```yaml
+type: custom:simple-thermostat
+entity: climate.my_room
+current_value_entity: sensor.living_room_temperature
+```
+
+Control a fan entity (percentage slider + preset / direction / oscillating modes):
+
+```yaml
+type: custom:simple-thermostat
+entity: fan.bedroom_fan
+```
+
+Control a humidifier entity (humidity slider + mode buttons):
+
+```yaml
+type: custom:simple-thermostat
+entity: humidifier.bedroom_humidifier
+```
+
 ### All options
 
 | Option       | Type                  | Default | Description |
 | ------------ | --------------------- | ------- | ----------- |
 | `entity`     | `string`              | **required** | Climate entity id |
+| `current_value_entity` | `string`    | —       | Use a different entity (e.g. a room thermometer) for the displayed current temperature |
 | `header`     | `false\|object`       | —       | See [Header config](#header-config) |
 | `setpoints`  | `false\|object`       | —       | See [Setpoints config](#setpoints-config) |
 | `layout`     | `object`              | —       | See [Layout options](#layout-options) |
@@ -536,6 +563,6 @@ control: false
 [hacs-url]: https://hacs.xyz
 [ha-badge]: https://img.shields.io/badge/Home%20Assistant-2024.1+-41BDF5.svg?style=for-the-badge&logo=homeassistant&logoColor=white
 [ha-url]: https://www.home-assistant.io
-[version-badge]: https://img.shields.io/badge/version-2.3.1-22c55e.svg?style=for-the-badge&logo=github&logoColor=white
+[version-badge]: https://img.shields.io/badge/version-2.3.2-22c55e.svg?style=for-the-badge&logo=github&logoColor=white
 [release-url]: https://github.com/duczz/ha-simple-thermostat
 [license-badge]: https://img.shields.io/badge/license-MIT-94a3b8.svg?style=for-the-badge

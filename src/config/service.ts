@@ -1,3 +1,6 @@
+import { EntityAdapter } from '../adapters/types'
+import { climateAdapter } from '../adapters/climate'
+
 export interface Service {
   domain: string
   service: string
@@ -6,12 +9,12 @@ export interface Service {
   }
 }
 
-export default function parseService(config: false | Service): Service {
+export default function parseService(
+  config: false | Service,
+  adapter: EntityAdapter = climateAdapter
+): Service {
   if (!config) {
-    return {
-      domain: 'climate',
-      service: 'set_temperature',
-    }
+    return adapter.getSetpointService()
   }
   return config
 }
