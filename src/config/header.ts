@@ -150,7 +150,7 @@ function parseFaults(config: Array<Fault> | undefined, hass: HASS) {
       .filter(({ entity }) => Boolean(hass.states?.[entity]))
       .map(({ entity, ...rest }: Fault) => ({
         ...rest,
-        state: hass.states[entity],
+        state: hass.states![entity],
         entity,
       }))
   }

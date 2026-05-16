@@ -1,5 +1,39 @@
 # Changelog
 
+## [2.3.3 - Unreleased]
+
+### ⚠️ Breaking Changes
+
+- **Minimum Home Assistant raised to 2024.4** — HACS now blocks install on older versions. `hass.performAction` (HA 2024.4+) is required; the legacy `hass.callService` fallback was removed from `_callAction`
+
+### 🐛 Bug Fixes
+
+- **Editor `DEFAULT_CONTROL` ignored adapter** — Editor's "delete `control` if it matches default" logic was hardcoded to `['hvac', 'preset']` (climate default); now uses the adapter's `getDefaultControl()` so fan / humidifier defaults are respected
+- **TypeScript: setpoint comparison with min/max** — `value >= maxTemp` / `<= minTemp` compared `string | number` against `number`; explicit `Number()` cast added
+
+### 🎨 HA-native editor pass
+
+Editor and entry-point reviewed against `home-assistant/frontend` master
+and brought in line where it diverged. Full audit notes in [`AUDIT.md`](AUDIT.md).
+
+- **Icons via `@mdi/js` SVG paths** — Replaced legacy `<ha-icon icon="mdi:book-open-variant">` in the editor footer with `<ha-svg-icon .path=${mdiBookOpenVariant}>`. Smaller bundle impact than lazy-loading the entire `mdi:` icon set, matches HA's own pattern. Added `@mdi/js@^7.4.47` as a dependency.
+- **Double-registration guard** — `customElements.define(...)` for both the card and its editor are now wrapped in `if (!customElements.get(...))`. Same for `window.customCards.push(...)`. Loading the bundle twice (HACS + a manual `resources:` entry) no longer throws `NotSupportedError`.
+- **`@state` / `@property` decorators** — Editor switched from Lit-1-style `static get properties()` to TypeScript decorators (`@state() config`, `@property({ attribute: false }) hass`). Gives proper reactive-update semantics and matches `main.ts`.
+- **`structuredClone` instead of `JSON.parse(JSON.stringify(...))`** — Browser-native deep clone (Baseline 2022, available in every HA-supported browser). Handles `Date` / `Map` / `Set` / cyclical refs correctly should the config shape ever need them.
+- **`setConfig(config: CardConfig)`** — Added the missing type annotation so refactors get caught at compile time.
+- **`window.open(..., '_blank', 'noopener')`** — Doc link button now opens with `noopener` so the linked page can't navigate this tab via `window.opener`.
+- **Console banner** — Switched from the plain `font-weight: bold` line to the two-block coloured banner used by most modern custom cards.
+- **Code comment** explaining why `customCards.type` is the bare element name without `custom:` prefix — to keep a future refactor from "fixing" it the wrong way.
+
+### 🔧 Code quality
+
+- Removed unused constants (`MODE_TYPES`, `DEFAULT_CONTROL` in `main.ts`)
+- Removed `NUMERIC_PATHS` dead branch in editor — `ha-form` already returns numbers from number selectors
+- Replaced repeated `(this.config.header as any)` casts with a single local `header` variable
+- Various narrating comments removed (`// Simple direct paths`, etc.) — code is self-explanatory
+- Editor imports regrouped (Lit → @mdi → local), `declare const` moved out of the import block
+- **`@types/jest` added** — `npm run typecheck` is now clean (was reporting `expect` / `test` as undefined). Also fixed 3 null-safety issues that became visible (`hass.states[entity]` in `header.ts`, two `querySelector` returns in `renderInfoItem.test.ts`)
+
 ## [2.3.2] – 2026-05-15
 
 ### ✨ Improvements

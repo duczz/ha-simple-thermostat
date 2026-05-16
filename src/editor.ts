@@ -1,19 +1,25 @@
 import { LitElement, html } from 'lit'
+import { state, property } from 'lit/decorators.js'
+import { mdiBookOpenVariant } from '@mdi/js'
+
 import styles from './styles.css'
 import fireEvent from './fireEvent'
-
 import { version } from '../package.json'
 import { CardConfig } from './config/card'
+import { HASS } from './types'
+import { getAdapter, EntityAdapter } from './adapters'
+
 declare const process: { env: { BUILD_TIME: string } }
 const BUILD_TIME = process.env.BUILD_TIME
-import { HASS } from './types'
 
 const GithubReadMe =
   'https://github.com/duczz/ha-simple-thermostat/blob/master/README.md'
 
-const cloneDeep = (obj) => JSON.parse(JSON.stringify(obj))
+// structuredClone is a browser-native deep clone (Baseline 2022); all HA-
+// supported browsers ship it. JSON.parse(JSON.stringify(...)) is the older
+// fallback we used to do.
+const cloneDeep = <T>(obj: T): T => structuredClone(obj)
 
-// Schema for the main ha-form. Wrapped in helper to evaluate config-dependent visibility.
 function buildSchema(config: any) {
   const headerSchema: any[] = []
   if (config.header !== false) {
@@ -201,12 +207,11 @@ const LABELS: Record<string, string> = {
   double_tap_action: 'Double-tap action',
 }
 
-const NUMERIC_PATHS = ['decimals']
 
 function setNested(obj: any, path: string, value: any) {
   const parts = path.split('.')
   let o = obj
-  while (parts.length - 1) {
+  while (parts.length > 1) {
     const p = parts.shift()!
     if (!Object.hasOwn(o, p)) o[p] = {}
     o = o[p]
@@ -225,35 +230,39 @@ function deleteNested(obj: any, path: string) {
   delete o[parts[0]]
 }
 
-function isModeEnabled(config: any, type: string): boolean {
+function isModeEnabled(
+  config: any,
+  type: string,
+  adapter: EntityAdapter
+): boolean {
   const control = config.control
   if (control === false) return false
   if (Array.isArray(control)) return control.includes(type)
-  return type === 'preset'
+  return adapter.getDefaultControl().includes(type)
 }
 
 export default class SimpleThermostatEditor extends LitElement {
-  config!: CardConfig
-  hass?: HASS
+  @state() config!: CardConfig
+  @property({ attribute: false }) hass?: HASS
 
   static get styles() {
     return styles
   }
 
-  static get properties() {
-    return { hass: {}, config: {} }
-  }
-
-  setConfig(config) {
-    this.config = config || {}
+  setConfig(config: CardConfig) {
+    this.config = config || ({} as CardConfig)
   }
 
   _openLink() {
-    window.open(GithubReadMe)
+    window.open(GithubReadMe, '_blank', 'noopener')
   }
 
-  // Build the flat data structure the form expects, derived from this.config
   _buildFormData() {
+    const adapter = getAdapter(this.config.entity)
+    const header: any =
+      this.config.header && typeof this.config.header === 'object'
+        ? this.config.header
+        : {}
     const data: any = {
       entity: this.config.entity ?? '',
       current_value_entity: this.config.current_value_entity ?? '',
@@ -274,17 +283,15 @@ export default class SimpleThermostatEditor extends LitElement {
       'layout.mode.names': this.config.layout?.mode?.names !== false,
       'layout.mode.icons': this.config.layout?.mode?.icons !== false,
       'layout.mode.headings': this.config.layout?.mode?.headings === true,
-      show_preset: isModeEnabled(this.config, 'preset'),
-      show_fan: isModeEnabled(this.config, 'fan'),
-      show_swing: isModeEnabled(this.config, 'swing'),
-      name: this.config.header && typeof this.config.header === 'object' ? this.config.header.name ?? '' : '',
-      icon: this.config.header && typeof this.config.header === 'object' ? (typeof this.config.header.icon === 'string' ? this.config.header.icon : '') : '',
-      'toggle.entity': (this.config.header as any)?.toggle?.entity ?? '',
-      'toggle.name': (this.config.header as any)?.toggle?.name ?? '',
+      show_preset: isModeEnabled(this.config, 'preset', adapter),
+      show_fan: isModeEnabled(this.config, 'fan', adapter),
+      show_swing: isModeEnabled(this.config, 'swing', adapter),
+      name: header.name ?? '',
+      icon: typeof header.icon === 'string' ? header.icon : '',
+      'toggle.entity': header.toggle?.entity ?? '',
+      'toggle.name': header.toggle?.name ?? '',
       'toggle.icon':
-        typeof (this.config.header as any)?.toggle?.icon === 'string'
-          ? (this.config.header as any).toggle.icon
-          : '',
+        typeof header.toggle?.icon === 'string' ? header.toggle.icon : '',
       tap_action: this.config.tap_action ?? { action: 'more-info' },
       hold_action: this.config.hold_action ?? { action: 'none' },
       double_tap_action: this.config.double_tap_action ?? { action: 'none' },
@@ -292,11 +299,9 @@ export default class SimpleThermostatEditor extends LitElement {
     return data
   }
 
-  // Translate a flat data update back into the nested config shape
   _applyFormChange(updated: any) {
     const copy = cloneDeep(this.config) as any
 
-    // Simple direct paths
     const directPaths = [
       'entity',
       'current_value_entity',
@@ -322,15 +327,11 @@ export default class SimpleThermostatEditor extends LitElement {
       const newVal = updated[path]
       if (newVal === undefined || newVal === null || newVal === '') {
         deleteNested(copy, path)
-      } else if (NUMERIC_PATHS.includes(path) && typeof newVal === 'string') {
-        const n = Number(newVal)
-        setNested(copy, path, Number.isNaN(n) ? newVal : n)
       } else {
         setNested(copy, path, newVal)
       }
     }
 
-    // Header on/off
     if (updated.show_header === false) {
       copy.header = false
     } else {
@@ -358,7 +359,6 @@ export default class SimpleThermostatEditor extends LitElement {
       }
     }
 
-    // Step size: 'auto' means delete config key
     if (updated.step_size === 'auto' || updated.step_size === '' || updated.step_size == null) {
       delete copy.step_size
     } else {
@@ -366,8 +366,8 @@ export default class SimpleThermostatEditor extends LitElement {
       copy.step_size = Number.isNaN(n) ? updated.step_size : n
     }
 
-    // Mode type toggles (preset/fan/swing) → control array
-    const DEFAULT_CONTROL = ['hvac', 'preset']
+    const adapter = getAdapter(copy.entity)
+    const defaultControl = adapter.getDefaultControl()
     const desired = ['hvac']
     if (updated.show_preset) desired.push('preset')
     if (updated.show_fan) desired.push('fan')
@@ -377,8 +377,8 @@ export default class SimpleThermostatEditor extends LitElement {
     if (namesOff && iconsOff) {
       copy.control = false
     } else if (
-      desired.length === DEFAULT_CONTROL.length &&
-      desired.every((v, i) => v === DEFAULT_CONTROL[i])
+      desired.length === defaultControl.length &&
+      desired.every((v, i) => v === defaultControl[i])
     ) {
       delete copy.control
     } else {
@@ -430,7 +430,7 @@ export default class SimpleThermostatEditor extends LitElement {
 
         <div class="editor-footer">
           <ha-button @click=${this._openLink}>
-            <ha-icon icon="mdi:book-open-variant" slot="icon"></ha-icon>
+            <ha-svg-icon .path=${mdiBookOpenVariant} slot="icon"></ha-svg-icon>
             All configuration options
           </ha-button>
           <span class="editor-footer__hint">

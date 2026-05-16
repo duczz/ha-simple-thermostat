@@ -7,6 +7,7 @@
 [![HACS][hacs-badge]][hacs-url]
 [![Home Assistant][ha-badge]][ha-url]
 [![Version][version-badge]][release-url]
+[![Downloads][downloads-badge]][release-url]
 [![License][license-badge]](LICENSE)
 
 </div>
@@ -24,7 +25,7 @@ This fork modernises [nervetattoo/simple-thermostat](https://github.com/nervetat
 ### Modernisation
 - **Multi-domain support** — Works with `climate.*`, `fan.*`, and `humidifier.*` entities. The card auto-detects the entity type and adapts setpoints, modes, and service calls (temperature/percentage/humidity) accordingly
 - **Separate current temperature entity** — `current_value_entity` lets you display the temperature from a different sensor (e.g. a room thermometer) instead of the thermostat's internal sensor
-- **Lit 3 migration** — fully compatible with HA 2024.1+
+- **Lit 3 migration** — fully compatible with HA 2024.4+
 - **`ha-form` based editor** — Visual editor uses Home Assistant's standard form renderer for consistent labels and future-proofing against HA's deprecation of `ha-textfield`
 - **Modern HA APIs** — `hass.performAction()` (HA 2024.8+), `hass.formatEntityState()` (HA 2022.6+), `hass.localize()` — all with graceful fallback to older APIs
 - **Auto-entity selection** — `getStubConfig()` auto-picks the first available `climate.*`, `fan.*`, or `humidifier.*` entity in the HA card picker
@@ -36,6 +37,7 @@ This fork modernises [nervetattoo/simple-thermostat](https://github.com/nervetat
 - **Loading state** — card shows a shimmering placeholder on first mount instead of a spurious "Entity not available" error
 - **Unavailable entity styling** — card is greyed out and non-interactive when the climate entity is `unavailable` or `unknown`
 - **Modern build tooling** — Node 24, updated Rollup/TypeScript/Jest plugins, `strictNullChecks` enabled, CI workflows
+- **HA-native editor pass** — Editor reviewed against `home-assistant/frontend` master and brought in line: `@mdi/js` SVG-icon paths instead of legacy `<ha-icon>`, double-registration guard, `@state`/`@property` decorators instead of Lit-1 `static get properties()`, `structuredClone` instead of JSON-stringify clone, `noopener` on external links.
 
 ### Bug fixes
 - **Temperature display missing** — `setpoints` auto-detection was broken; cards without explicit `setpoints` config showed no temperature
@@ -86,7 +88,7 @@ For the full list of changes see [CHANGELOG.md](CHANGELOG.md).
 
 ## 📦 Requirements
 
-- Home Assistant **2024.1** or higher
+- Home Assistant **2024.4** or higher
 - HACS (recommended) or manual install
 
 ---
@@ -561,8 +563,9 @@ control: false
 
 [hacs-badge]: https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge&logo=homeassistantcommunitystore&logoColor=white
 [hacs-url]: https://hacs.xyz
-[ha-badge]: https://img.shields.io/badge/Home%20Assistant-2024.1+-41BDF5.svg?style=for-the-badge&logo=homeassistant&logoColor=white
+[ha-badge]: https://img.shields.io/badge/Home%20Assistant-2024.4+-41BDF5.svg?style=for-the-badge&logo=homeassistant&logoColor=white
 [ha-url]: https://www.home-assistant.io
-[version-badge]: https://img.shields.io/badge/version-2.3.2-22c55e.svg?style=for-the-badge&logo=github&logoColor=white
+[version-badge]: https://img.shields.io/badge/version-2.3.3-22c55e.svg?style=for-the-badge&logo=github&logoColor=white
+[downloads-badge]: https://img.shields.io/github/downloads/duczz/ha-simple-thermostat/total.svg?style=for-the-badge&logo=github&logoColor=white&color=blueviolet
 [release-url]: https://github.com/duczz/ha-simple-thermostat
 [license-badge]: https://img.shields.io/badge/license-MIT-94a3b8.svg?style=for-the-badge

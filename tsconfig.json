@@ -11,7 +11,7 @@
     "useDefineForClassFields": false,
     "rootDir": "./src",
     "outDir": "./dist",
-    "types": ["node"]
+    "types": ["jest", "node"]
   },
   "include": ["./src"]
 }

@@ -39,9 +39,7 @@ const STEP_SIZE = 0.5
 const DECIMALS = 1
 const UPDATING_TIMEOUT = 10000
 
-const MODE_TYPES: Array<string> = Object.values(MODES)
 
-const DEFAULT_CONTROL = [MODES.HVAC, MODES.PRESET]
 
 const ICONS = {
   UP: 'hass:chevron-up',
@@ -158,13 +156,7 @@ export default class SimpleThermostat extends LitElement {
   )
 
   _callAction(action: string, data: object) {
-    if (this._hass.performAction) {
-      this._hass.performAction({ action, data })
-    } else {
-      const parts = action.split('.')
-      if (parts.length < 2) return
-      this._hass.callService(parts[0], parts.slice(1).join('.'), data)
-    }
+    this._hass.performAction({ action, data })
   }
 
   static getConfigElement() {
@@ -540,11 +532,12 @@ export default class SimpleThermostat extends LitElement {
           ${sensorsHtml}
           ${Object.entries(_values).map(([field, value]) => {
             const hasValue = ['string', 'number'].includes(typeof value)
+            const numericValue = typeof value === 'number' ? value : Number(value)
             const showUnit = unit !== false && hasValue
             return html`
               <div class="current-wrapper ${stepLayout}">
                 <ha-icon-button
-                  ?disabled=${maxTemp !== null && value >= maxTemp}
+                  ?disabled=${maxTemp !== null && numericValue >= maxTemp}
                   class="thermostat-trigger"
                   aria-label="Increase ${field}"
                   .label=${`Increase ${field}`}
@@ -579,7 +572,7 @@ export default class SimpleThermostat extends LitElement {
                     : nothing}
                 </h3>
                 <ha-icon-button
-                  ?disabled=${minTemp !== null && value <= minTemp}
+                  ?disabled=${minTemp !== null && numericValue <= minTemp}
                   class="thermostat-trigger"
                   aria-label="Decrease ${field}"
                   .label=${`Decrease ${field}`}
