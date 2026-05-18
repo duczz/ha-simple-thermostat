@@ -1,13 +1,15 @@
 name: Release
 
+# Triggers when a release is published via the GitHub UI.
+# `push.tags` triggers do not reliably fire for tags created through the UI —
+# `release` events do.
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
 
 jobs:
   release:
-    name: Release
+    name: Attach build asset and CHANGELOG body
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -26,8 +28,42 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/ha-simple-thermostat.js
-          generate_release_notes: true
+      - name: Extract CHANGELOG section for this tag
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          echo "Extracting CHANGELOG section for v$VERSION..."
+          awk -v ver="$VERSION" '
+            BEGIN { capture = 0 }
+            /^## \[/ {
+              if (capture) { exit }
+              if (index($0, "[" ver "]")) { capture = 1; next }
+            }
+            capture { print }
+          ' CHANGELOG.md > release-body.md
+          if [ -s release-body.md ]; then
+            echo "::group::Release body"
+            cat release-body.md
+            echo "::endgroup::"
+          else
+            echo "No CHANGELOG entry for v$VERSION — body left as-is."
+            rm -f release-body.md
+          fi
+
+      - name: Upload dist as release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            dist/simple-thermostat.js \
+            --repo "${{ github.repository }}" \
+            --clobber
+
+      - name: Update release body from CHANGELOG
+        if: hashFiles('release-body.md') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${{ github.event.release.tag_name }}" \
+            --repo "${{ github.repository }}" \
+            --notes-file release-body.md
