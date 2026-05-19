@@ -30,3 +30,7 @@ Desktop.ini
 .idea
 *.swp
 *.swo
+
+# Local-only AI assistant notes (lives in PersonalOS brain too)
+CLAUDE.md
+.claude/

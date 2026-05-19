@@ -15,7 +15,7 @@
 
 ---
 
-This is a fork of [nervetattoo/simple-thermostat](https://github.com/nervetattoo/simple-thermostat) — a Lovelace card that provides a simpler, more modular thermostat interface for Home Assistant. This fork applies several bug fixes, modernisations, and improvements on top of the last official release.
+A clean, modular thermostat card for Home Assistant — control `climate.*`, `fan.*` and `humidifier.*` entities from a single, themable Lovelace card with a full visual editor.
 
 ---
 
