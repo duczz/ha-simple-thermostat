@@ -2,7 +2,7 @@
 
 # Simple Thermostat
 
-### A patched & improved thermostat card for Home Assistant Lovelace UI
+### A HVAC, thermostat, climate card for Home Assistant Lovelace UI
 
 [![HACS][hacs-badge]][hacs-url]
 [![Home Assistant][ha-badge]][ha-url]
