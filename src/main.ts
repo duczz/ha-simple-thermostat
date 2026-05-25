@@ -534,7 +534,8 @@ export default class SimpleThermostat extends LitElement {
         <section class="body">
           ${sensorsHtml}
           ${config.hide_setpoint === true ? nothing : Object.entries(_values).map(([field, value]) => {
-            const hasValue = ['string', 'number'].includes(typeof value)
+            const isOff = entity.state === HVAC_MODES.OFF
+            const hasValue = !isOff && ['string', 'number'].includes(typeof value)
             const numericValue = typeof value === 'number' ? value : Number(value)
             const showUnit = unit !== false && hasValue
             return html`
@@ -569,9 +570,8 @@ export default class SimpleThermostat extends LitElement {
                     ? 'current--value updating'
                     : 'current--value'}
                 >
-                  ${formatNumber(value, {
+                  ${isOff ? 'OFF' : formatNumber(value, {
                     ...config,
-                    fallback: entity.state === HVAC_MODES.OFF ? 'OFF' : config.fallback,
                     locale: this._hass?.locale,
                   })}
                   ${showUnit
