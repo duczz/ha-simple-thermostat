@@ -70,8 +70,6 @@ function buildSchema(config: any) {
             { name: 'show_swing', selector: { boolean: {} } },
             { name: 'show_swing_horizontal', selector: { boolean: {} } },
             { name: 'show_swing_vertical', selector: { boolean: {} } },
-            { name: 'show_vane_horizontal', selector: { boolean: {} } },
-            { name: 'show_vane_vertical', selector: { boolean: {} } },
           ],
         },
         {
@@ -195,8 +193,6 @@ const LABELS: Record<string, string> = {
   show_swing: 'Swing mode',
   show_swing_horizontal: 'Swing horizontal',
   show_swing_vertical: 'Swing vertical',
-  show_vane_horizontal: 'Vane horizontal',
-  show_vane_vertical: 'Vane vertical',
   'layout.mode.names': 'Show mode names',
   'layout.mode.icons': 'Show mode icons',
   'layout.mode.headings': 'Show mode headings',
@@ -300,8 +296,6 @@ export default class SimpleThermostatEditor extends LitElement {
       show_swing: isModeEnabled(this.config, 'swing', adapter),
       show_swing_horizontal: isModeEnabled(this.config, 'swing_horizontal', adapter),
       show_swing_vertical: isModeEnabled(this.config, 'swing_vertical', adapter),
-      show_vane_horizontal: isModeEnabled(this.config, 'vane_horizontal', adapter),
-      show_vane_vertical: isModeEnabled(this.config, 'vane_vertical', adapter),
       name: header.name ?? '',
       icon: typeof header.icon === 'string' ? header.icon : '',
       'toggle.entity': header.toggle?.entity ?? '',
@@ -391,8 +385,6 @@ export default class SimpleThermostatEditor extends LitElement {
     if (updated.show_swing) desired.push('swing')
     if (updated.show_swing_horizontal) desired.push('swing_horizontal')
     if (updated.show_swing_vertical) desired.push('swing_vertical')
-    if (updated.show_vane_horizontal) desired.push('vane_horizontal')
-    if (updated.show_vane_vertical) desired.push('vane_vertical')
     const namesOff = updated['layout.mode.names'] === false
     const iconsOff = updated['layout.mode.icons'] === false
     if (namesOff && iconsOff) {
