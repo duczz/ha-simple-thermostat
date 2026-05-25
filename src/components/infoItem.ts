@@ -14,7 +14,6 @@ interface InfoItemOptions {
   hide?: boolean
   state: any
   hass: any
-  localize?
   openEntityPopover?
   details: InfoItemDetails
 }
@@ -24,7 +23,6 @@ export default function renderInfoItem({
   hass,
   state,
   details,
-  localize,
   openEntityPopover,
 }: InfoItemOptions) {
   if (hide || typeof state === 'undefined') return
@@ -32,9 +30,6 @@ export default function renderInfoItem({
   const { type, heading, icon, unit, decimals } = details
 
   let valueCell
-  if (process.env.DEBUG) {
-    console.log('ST: infoItem', { state, details })
-  }
   if (type === 'relativetime') {
     valueCell = html`
       <div class="sensor-value">
@@ -42,14 +37,6 @@ export default function renderInfoItem({
       </div>
     `
   } else if (typeof state === 'object') {
-    const [domain] = state.entity_id.split('.')
-    const prefix = [
-      'component',
-      domain,
-      'state',
-      state.attributes?.device_class ?? '_',
-      '',
-    ].join('.')
     let value
     let displayUnit = ''
 
@@ -62,16 +49,7 @@ export default function renderInfoItem({
       value = rawState
       displayUnit = unit ? ` ${unit}` : '' // Allows overriding to empty string to hide unit
     } else {
-      // No custom unit: use HA's native formatting which includes localized native units
-      const haFormatted = hass.formatEntityState?.(state)
-      value = haFormatted ?? localize?.(state.state, prefix) ?? state.state
-      if (!haFormatted) {
-        if (typeof decimals === 'number') {
-          value = formatNumber(value, { decimals })
-        }
-        // Only append native unit manually if formatEntityState was not available
-        displayUnit = state.attributes?.unit_of_measurement ? ` ${state.attributes.unit_of_measurement}` : ''
-      }
+      value = hass.formatEntityState(state)
     }
 
     valueCell = html`

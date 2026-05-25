@@ -8,6 +8,10 @@ export enum MODES {
   FAN = 'fan',
   PRESET = 'preset',
   SWING = 'swing',
+  SWING_HORIZONTAL = 'swing_horizontal',
+  SWING_VERTICAL = 'swing_vertical',
+  VANE_HORIZONTAL = 'vane_horizontal',
+  VANE_VERTICAL = 'vane_vertical',
 }
 
 export type ModeValue = {
@@ -27,6 +31,10 @@ type ModeControl = {
   fan: ModeControlValue
   preset: ModeControlValue
   swing: ModeControlValue
+  swing_horizontal: ModeControlValue
+  swing_vertical: ModeControlValue
+  vane_horizontal: ModeControlValue
+  vane_vertical: ModeControlValue
 }
 
 interface CardConfig {
@@ -38,6 +46,7 @@ interface CardConfig {
   sensors?: false | Array<ConfigSensor & TemplatedSensor>
   version?: 2 | 3
   setpoints?: false | Setpoints
+  hide_setpoint?: boolean
   decimals?: number
   step_size?: number
   variables?: LooseObject

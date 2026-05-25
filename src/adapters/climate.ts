@@ -36,14 +36,17 @@ export const climateAdapter: EntityAdapter = {
   },
 
   getModeService(type: string): string {
+    if (type === 'vane_horizontal' || type === 'vane_vertical') return `climate.set_${type}`
     return `climate.set_${type}_mode`
   },
 
   getModePayloadKey(type: string): string {
+    if (type === 'vane_horizontal' || type === 'vane_vertical') return type
     return `${type}_mode`
   },
 
   getModeAttribute(type: string): string {
+    if (type === 'vane_horizontal' || type === 'vane_vertical') return `${type}_positions`
     return `${type}_modes`
   },
 

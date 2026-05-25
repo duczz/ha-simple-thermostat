@@ -1,10 +1,28 @@
 # Changelog
 
-## [2.3.3] – 2026-05-16
+## [2.3.4] – 2026-05-25
 
 ### ⚠️ Breaking Changes
 
-- **Minimum Home Assistant raised to 2024.4** — HACS now blocks install on older versions. `hass.performAction` (HA 2024.4+) is required; the legacy `hass.callService` fallback was removed from `_callAction`
+- **Minimum Home Assistant raised to 2024.8** — HACS now blocks install on older versions. Previous `hacs.json` incorrectly stated 2024.4. `_callAction` now uses `hass.performAction` (HA 2024.8+) with automatic `hass.callService` fallback for manual installs on older versions
+
+### ✨ New Features
+
+- **`hide_setpoint`** — New config option to hide the temperature/percentage setpoint controls while keeping mode buttons visible (useful for fan or humidifier entities where only mode selection is needed)
+- **Extended swing & vane modes** — `swing_horizontal`, `swing_vertical`, `vane_horizontal`, `vane_vertical` as separate control types in the `control:` config and in the visual editor. Enables climate devices with directional vanes (Daikin, Mitsubishi, etc.) to expose all position controls
+- **Native HA formatting for mode labels** — Mode button labels now use `hass.formatEntityState()` for HVAC modes and `hass.formatEntityAttributeValue()` for all other modes. Properly localized in all HA languages; old hardcoded localization prefix strings removed
+- **OFF fallback** — Setpoint display shows "OFF" instead of "N/A" when the entity state is `off`
+
+### 🐛 Bug Fixes
+
+- **Editor `isModeEnabled` ignored object-form `control`** — When `control:` was an object (fine-grained per-mode config), the editor toggles fell back to the adapter default instead of checking the object keys. Toggling a mode in the editor could silently lose YAML config
+- **`window.open` without `noopener`** — `url` tap action now opens with `'_blank', 'noopener'` matching the editor's doc link
+
+### 🔧 Code quality
+
+- **Dead code removed** — `formatEntityState?.()` optional chaining (guaranteed on HA 2024.8+), localization fallback strings in `modeType.ts` / `sensors.ts` / `infoItem.ts`, `process.env.DEBUG` console.log, unused `localize` parameter in `renderInfoItem`, unused `state` / `domain` / `prefix` variables
+
+## [2.3.3] – 2026-05-16
 
 ### 🐛 Bug Fixes
 

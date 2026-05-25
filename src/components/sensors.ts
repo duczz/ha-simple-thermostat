@@ -15,7 +15,6 @@ export default function renderSensors({
   openEntityPopover,
 }) {
   const {
-    state,
     attributes: { hvac_action: action },
   } = entity
 
@@ -30,15 +29,9 @@ export default function renderSensors({
 
   const showLabels = config?.layout?.sensors?.labels ?? true
   const domain = adapter.getLocalizationDomain()
-  let stateString =
-    hass.formatEntityState?.(entity) ??
-    localize(state, `component.${domain}.state._.`)
+  let stateString = hass.formatEntityState(entity)
   if (action) {
-    const actionLabel =
-      localize(
-        action,
-        `component.${domain}.entity_component._.state_attributes.hvac_action.state.`
-      ) || localize(action, `state_attributes.${domain}.hvac_action.`)
+    const actionLabel = hass.formatEntityAttributeValue(entity, 'hvac_action', action)
     stateString = [actionLabel, ` (${stateString})`].join('')
   }
   const sensorHtml = [
@@ -67,7 +60,6 @@ export default function renderSensors({
       return renderInfoItem({
         state,
         hass,
-        localize,
         openEntityPopover,
         details: {
           ...rest,

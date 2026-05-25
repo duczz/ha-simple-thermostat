@@ -76,6 +76,12 @@ export const MODE_ICONS = {
   right: 'mdi:arrow-right',
   // Swing modes — combined
   both: 'mdi:arrow-all',
+  // Vane positions
+  swing: 'mdi:arrow-oscillating',
+  wide: 'mdi:arrow-expand-horizontal',
+  narrow: 'mdi:arrow-collapse-horizontal',
+  mid: 'mdi:arrow-collapse-vertical',
+  split: 'mdi:arrow-split-vertical',
 }
 
 type Icon = string | false | LooseObject

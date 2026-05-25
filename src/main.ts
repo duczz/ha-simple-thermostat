@@ -39,8 +39,6 @@ const STEP_SIZE = 0.5
 const DECIMALS = 1
 const UPDATING_TIMEOUT = 10000
 
-
-
 const ICONS = {
   UP: 'hass:chevron-up',
   DOWN: 'hass:chevron-down',
@@ -156,7 +154,12 @@ export default class SimpleThermostat extends LitElement {
   )
 
   _callAction(action: string, data: object) {
-    this._hass.performAction({ action, data })
+    if (typeof this._hass.performAction === 'function') {
+      this._hass.performAction({ action, data })
+    } else {
+      const [domain, service] = action.split('.')
+      this._hass.callService(domain, service, data)
+    }
   }
 
   static getConfigElement() {
@@ -336,7 +339,7 @@ export default class SimpleThermostat extends LitElement {
         } as ControlMode
       }
       const mode = attributes[adapter.getModePayloadKey(values.type!)]
-      return { ...values, mode: String(mode) } as ControlMode
+      return { ...values, mode: mode != null ? String(mode) : 'none' } as ControlMode
     })
 
     if (this.config.step_size) {
@@ -530,7 +533,7 @@ export default class SimpleThermostat extends LitElement {
         })}
         <section class="body">
           ${sensorsHtml}
-          ${Object.entries(_values).map(([field, value]) => {
+          ${config.hide_setpoint === true ? nothing : Object.entries(_values).map(([field, value]) => {
             const hasValue = ['string', 'number'].includes(typeof value)
             const numericValue = typeof value === 'number' ? value : Number(value)
             const showUnit = unit !== false && hasValue
@@ -566,7 +569,11 @@ export default class SimpleThermostat extends LitElement {
                     ? 'current--value updating'
                     : 'current--value'}
                 >
-                  ${formatNumber(value, { ...config, locale: this._hass?.locale })}
+                  ${formatNumber(value, {
+                    ...config,
+                    fallback: entity.state === HVAC_MODES.OFF ? 'OFF' : config.fallback,
+                    locale: this._hass?.locale,
+                  })}
                   ${showUnit
                     ? html`<span class="current--unit">${unit}</span>`
                     : nothing}
@@ -588,6 +595,8 @@ export default class SimpleThermostat extends LitElement {
         ${this.modes.map((mode) =>
           renderModeType({
             state: entity.state,
+            entity,
+            hass: this._hass,
             mode,
             localize: this.localize,
             modeOptions: this.config?.layout?.mode ?? {},
@@ -706,7 +715,7 @@ export default class SimpleThermostat extends LitElement {
         fireEvent(window, 'location-changed', { replace: false })
         return
       case 'url':
-        window.open(action.url_path)
+        window.open(action.url_path, '_blank', 'noopener')
         return
       case 'toggle':
         this._callAction('homeassistant.toggle', {
@@ -726,7 +735,7 @@ export default class SimpleThermostat extends LitElement {
     return size
   }
 
-getUnit(): string | boolean {
+  getUnit(): string | boolean {
     if (this.config.unit !== undefined) {
       return this.config.unit
     }

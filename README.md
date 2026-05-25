@@ -26,15 +26,17 @@ This fork modernises [nervetattoo/simple-thermostat](https://github.com/nervetat
 ### Modernisation
 - **Multi-domain support** — Works with `climate.*`, `fan.*`, and `humidifier.*` entities. The card auto-detects the entity type and adapts setpoints, modes, and service calls (temperature/percentage/humidity) accordingly
 - **Separate current temperature entity** — `current_value_entity` lets you display the temperature from a different sensor (e.g. a room thermometer) instead of the thermostat's internal sensor
-- **Lit 3 migration** — fully compatible with HA 2024.4+
+- **Lit 3 migration** — fully compatible with HA 2024.8+
 - **`ha-form` based editor** — Visual editor uses Home Assistant's standard form renderer for consistent labels and future-proofing against HA's deprecation of `ha-textfield`
-- **Modern HA APIs** — `hass.performAction()` (HA 2024.8+), `hass.formatEntityState()` (HA 2022.6+), `hass.localize()` — all with graceful fallback to older APIs
+- **Modern HA APIs** — `hass.performAction()`, `hass.formatEntityState()`, `hass.formatEntityAttributeValue()`, `hass.localize()` — requires HA 2024.8+
 - **Auto-entity selection** — `getStubConfig()` auto-picks the first available `climate.*`, `fan.*`, or `humidifier.*` entity in the HA card picker
 - **Custom CSS support** — native `styles:` config key; no card-mod required for per-card overrides
 - **Locale-aware number formatting** — temperature display respects the HA user's locale (comma vs. dot as decimal separator)
 - **Visual editor** — collapsible sections for Header, Mode Controls, Layout & Display (incl. Hide, Labels, Sensors), Interactions, and Custom CSS with syntax highlighting; all common options configurable without YAML
 - **Header toggle icon** — `header.toggle.icon` configurable in the visual editor
 - **Tap / hold / double-tap actions** — full HA-standard `tap_action`, `hold_action`, `double_tap_action` on the temperature display (more-info / none / navigate / url / toggle / call-service); configurable in the Interactions editor panel
+- **Hide setpoint controls** — `hide_setpoint: true` hides the temperature/percentage setpoint buttons while keeping mode controls visible (useful for fan or humidifier entities)
+- **Extended swing & vane modes** — `swing_horizontal`, `swing_vertical`, `vane_horizontal`, `vane_vertical` as separate control types for climate entities (Daikin, Mitsubishi, etc.)
 - **Loading state** — card shows a shimmering placeholder on first mount instead of a spurious "Entity not available" error
 - **Unavailable entity styling** — card is greyed out and non-interactive when the climate entity is `unavailable` or `unknown`
 - **Modern build tooling** — Node 24, updated Rollup/TypeScript/Jest plugins, `strictNullChecks` enabled, CI workflows
@@ -89,7 +91,7 @@ For the full list of changes see [CHANGELOG.md](CHANGELOG.md).
 
 ## 📦 Requirements
 
-- Home Assistant **2024.4** or higher
+- Home Assistant **2024.8** or higher
 - HACS (recommended) or manual install
 
 ---
@@ -186,6 +188,7 @@ entity: humidifier.bedroom_humidifier
 | `unit`       | `string\|false`       | —       | Override or hide the displayed unit |
 | `decimals`   | `number`              | `1`     | Number of decimal places |
 | `fallback`   | `string`              | `N/A`   | Text when no setpoint is available |
+| `hide_setpoint` | `boolean`          | `false` | Hide the setpoint up/down controls (keeps mode buttons visible) |
 | `step_size`  | `number`              | auto    | Step for temperature up/down; defaults to the entity's `target_temp_step` attribute |
 | `label`      | `object`              | —       | Override `temperature` / `state` labels |
 | `hide`       | `object`              | —       | `temperature: bool`, `state: bool` |
@@ -282,7 +285,14 @@ By default the card shows `hvac` and `preset` (if available). Override with an a
 control:
   - hvac
   - preset
+  - swing
+  - swing_horizontal
+  - swing_vertical
+  - vane_horizontal
+  - vane_vertical
 ```
+
+Available mode types: `hvac`, `fan`, `preset`, `swing`, `swing_horizontal`, `swing_vertical`, `vane_horizontal`, `vane_vertical`. The card only renders a mode type if the entity actually exposes the corresponding attribute.
 
 Or use an object for fine-grained control over specific modes:
 
@@ -564,9 +574,9 @@ control: false
 
 [hacs-badge]: https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge&logo=homeassistantcommunitystore&logoColor=white
 [hacs-url]: https://hacs.xyz
-[ha-badge]: https://img.shields.io/badge/Home%20Assistant-2024.4+-41BDF5.svg?style=for-the-badge&logo=homeassistant&logoColor=white
+[ha-badge]: https://img.shields.io/badge/Home%20Assistant-2024.8+-41BDF5.svg?style=for-the-badge&logo=homeassistant&logoColor=white
 [ha-url]: https://www.home-assistant.io
-[version-badge]: https://img.shields.io/badge/version-2.3.3-22c55e.svg?style=for-the-badge&logo=github&logoColor=white
+[version-badge]: https://img.shields.io/badge/version-2.3.4-22c55e.svg?style=for-the-badge&logo=github&logoColor=white
 [downloads-badge]: https://img.shields.io/github/downloads/duczz/ha-simple-thermostat/total.svg?style=for-the-badge&logo=github&logoColor=white&color=blueviolet
 [release-url]: https://github.com/duczz/ha-simple-thermostat
 [license-badge]: https://img.shields.io/badge/license-MIT-94a3b8.svg?style=for-the-badge

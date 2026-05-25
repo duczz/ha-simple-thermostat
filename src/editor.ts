@@ -68,6 +68,10 @@ function buildSchema(config: any) {
             { name: 'show_preset', selector: { boolean: {} } },
             { name: 'show_fan', selector: { boolean: {} } },
             { name: 'show_swing', selector: { boolean: {} } },
+            { name: 'show_swing_horizontal', selector: { boolean: {} } },
+            { name: 'show_swing_vertical', selector: { boolean: {} } },
+            { name: 'show_vane_horizontal', selector: { boolean: {} } },
+            { name: 'show_vane_vertical', selector: { boolean: {} } },
           ],
         },
         {
@@ -127,6 +131,7 @@ function buildSchema(config: any) {
           ],
         },
         { name: 'fallback', selector: { text: {} } },
+        { name: 'hide_setpoint', selector: { boolean: {} } },
         {
           type: 'grid',
           column_min_width: '160px',
@@ -188,6 +193,10 @@ const LABELS: Record<string, string> = {
   show_preset: 'Preset mode',
   show_fan: 'Fan mode',
   show_swing: 'Swing mode',
+  show_swing_horizontal: 'Swing horizontal',
+  show_swing_vertical: 'Swing vertical',
+  show_vane_horizontal: 'Vane horizontal',
+  show_vane_vertical: 'Vane vertical',
   'layout.mode.names': 'Show mode names',
   'layout.mode.icons': 'Show mode icons',
   'layout.mode.headings': 'Show mode headings',
@@ -196,6 +205,7 @@ const LABELS: Record<string, string> = {
   'layout.step': 'Step layout',
   step_size: 'Step size',
   fallback: 'Fallback text',
+  hide_setpoint: 'Hide setpoint controls',
   'hide.temperature': 'Hide temperature',
   'hide.state': 'Hide state',
   'label.temperature': 'Temperature label',
@@ -238,6 +248,7 @@ function isModeEnabled(
   const control = config.control
   if (control === false) return false
   if (Array.isArray(control)) return control.includes(type)
+  if (typeof control === 'object') return type in control
   return adapter.getDefaultControl().includes(type)
 }
 
@@ -283,9 +294,14 @@ export default class SimpleThermostatEditor extends LitElement {
       'layout.mode.names': this.config.layout?.mode?.names !== false,
       'layout.mode.icons': this.config.layout?.mode?.icons !== false,
       'layout.mode.headings': this.config.layout?.mode?.headings === true,
+      hide_setpoint: this.config.hide_setpoint === true,
       show_preset: isModeEnabled(this.config, 'preset', adapter),
       show_fan: isModeEnabled(this.config, 'fan', adapter),
       show_swing: isModeEnabled(this.config, 'swing', adapter),
+      show_swing_horizontal: isModeEnabled(this.config, 'swing_horizontal', adapter),
+      show_swing_vertical: isModeEnabled(this.config, 'swing_vertical', adapter),
+      show_vane_horizontal: isModeEnabled(this.config, 'vane_horizontal', adapter),
+      show_vane_vertical: isModeEnabled(this.config, 'vane_vertical', adapter),
       name: header.name ?? '',
       icon: typeof header.icon === 'string' ? header.icon : '',
       'toggle.entity': header.toggle?.entity ?? '',
@@ -305,6 +321,7 @@ export default class SimpleThermostatEditor extends LitElement {
     const directPaths = [
       'entity',
       'current_value_entity',
+      'hide_setpoint',
       'decimals',
       'unit',
       'fallback',
@@ -372,6 +389,10 @@ export default class SimpleThermostatEditor extends LitElement {
     if (updated.show_preset) desired.push('preset')
     if (updated.show_fan) desired.push('fan')
     if (updated.show_swing) desired.push('swing')
+    if (updated.show_swing_horizontal) desired.push('swing_horizontal')
+    if (updated.show_swing_vertical) desired.push('swing_vertical')
+    if (updated.show_vane_horizontal) desired.push('vane_horizontal')
+    if (updated.show_vane_vertical) desired.push('vane_vertical')
     const namesOff = updated['layout.mode.names'] === false
     const iconsOff = updated['layout.mode.icons'] === false
     if (namesOff && iconsOff) {

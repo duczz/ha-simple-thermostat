@@ -1,8 +1,12 @@
 import { html } from 'lit'
 import { ControlMode, HVAC_MODES } from '../types'
 
+const POSITION_MODES = ['vane_horizontal', 'vane_vertical']
+
 interface ModeTypeOptions {
   state: string
+  entity: any
+  hass: any
   mode: ControlMode
   modeOptions
   localize
@@ -11,6 +15,8 @@ interface ModeTypeOptions {
 
 export default function renderModeType({
   state,
+  entity,
+  hass,
   mode: options,
   modeOptions,
   localize,
@@ -21,18 +27,20 @@ export default function renderModeType({
     return null
   }
 
-  const maybeRenderName = (name: string | false) => {
+  const modeAttribute = POSITION_MODES.includes(type) ? type : `${type}_mode`
+
+  const maybeRenderName = (name: string | false, value: string) => {
     if (name === false) return null
     if (modeOptions?.names === false) return null
-    if (type === 'hvac') {
-      return localize(name, 'component.climate.state._.')
+
+    try {
+      if (type === 'hvac') {
+        return hass.formatEntityState({ ...entity, state: value })
+      }
+      return hass.formatEntityAttributeValue(entity, modeAttribute, value)
+    } catch {
+      return name
     }
-    return (
-      localize(
-        name,
-        `component.climate.entity_component._.state_attributes.${type}_mode.state.`
-      ) || localize(name, `state_attributes.climate.${type}_mode.`)
-    )
   }
   const maybeRenderIcon = (icon: string) => {
     if (!icon) return null
@@ -40,13 +48,20 @@ export default function renderModeType({
     return html` <ha-icon class="mode-icon" .icon=${icon}></ha-icon> `
   }
 
+  const FALLBACK_TITLES: Record<string, string> = {
+    hvac: 'Operation',
+    vane_horizontal: 'Vane Horizontal',
+    vane_vertical: 'Vane Vertical',
+    swing_horizontal: 'Swing Horizontal',
+    swing_vertical: 'Swing Vertical',
+  }
   const str = type === 'hvac' ? 'operation' : `${type}_mode`
   let title = name || localize(`ui.card.climate.${str}`)
   if (title === `ui.card.climate.${str}`) {
     const attrKey = `state_attributes.climate.${type === 'hvac' ? 'hvac' : type}_mode`
     title = localize(attrKey)
     if (title === attrKey) {
-      title = str === 'operation' ? 'Operation' : 'Mode'
+      title = FALLBACK_TITLES[type] ?? 'Mode'
     }
   }
   const headings = modeOptions?.headings ?? false
@@ -70,7 +85,7 @@ export default function renderModeType({
               }
             }}
           >
-            ${maybeRenderIcon(icon)} ${maybeRenderName(name)}
+            ${maybeRenderIcon(icon)} ${maybeRenderName(name, value)}
           </div>
         `
       )}
