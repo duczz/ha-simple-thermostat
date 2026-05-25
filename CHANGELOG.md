@@ -8,15 +8,17 @@
 
 ### ✨ New Features
 
-- **`hide_setpoint`** — New config option to hide the temperature/percentage setpoint controls while keeping mode buttons visible (useful for fan or humidifier entities where only mode selection is needed)
-- **Extended swing & vane modes** — `swing_horizontal`, `swing_vertical`, `vane_horizontal`, `vane_vertical` as separate control types in the `control:` config and in the visual editor. Enables climate devices with directional vanes (Daikin, Mitsubishi, etc.) to expose all position controls
+- **`hide_setpoint`** — New config option to hide the temperature/percentage setpoint controls while keeping mode buttons visible. Useful for fan or humidifier entities where only mode selection is needed. Configurable in the visual editor under *Layout & Display*
+- **Extended swing & vane modes** — `swing_horizontal` and `swing_vertical` as new control types in the visual editor and YAML `control:` config. `vane_horizontal` and `vane_vertical` available via YAML for Mitsubishi/melcloud setups. Enables climate devices with directional vanes (Daikin, Mitsubishi, etc.) to expose all position controls
 - **Native HA formatting for mode labels** — Mode button labels now use `hass.formatEntityState()` for HVAC modes and `hass.formatEntityAttributeValue()` for all other modes. Properly localized in all HA languages; old hardcoded localization prefix strings removed
 - **OFF fallback** — Setpoint display shows "OFF" instead of "N/A" when the entity state is `off`
 
 ### 🐛 Bug Fixes
 
+- **`performAction` crash on older HA** — `_callAction` now checks for `performAction` at runtime and falls back to `callService` — prevents `TypeError: this._hass.performAction is not a function` on manual installs or HA versions before 2024.8
 - **Editor `isModeEnabled` ignored object-form `control`** — When `control:` was an object (fine-grained per-mode config), the editor toggles fell back to the adapter default instead of checking the object keys. Toggling a mode in the editor could silently lose YAML config
 - **`window.open` without `noopener`** — `url` tap action now opens with `'_blank', 'noopener'` matching the editor's doc link
+- **Mode value `undefined` rendered as text** — When a mode attribute existed but had no current value, the active mode showed as `"undefined"` instead of `"none"`
 
 ### 🔧 Code quality
 

@@ -36,7 +36,7 @@ This fork modernises [nervetattoo/simple-thermostat](https://github.com/nervetat
 - **Header toggle icon** — `header.toggle.icon` configurable in the visual editor
 - **Tap / hold / double-tap actions** — full HA-standard `tap_action`, `hold_action`, `double_tap_action` on the temperature display (more-info / none / navigate / url / toggle / call-service); configurable in the Interactions editor panel
 - **Hide setpoint controls** — `hide_setpoint: true` hides the temperature/percentage setpoint buttons while keeping mode controls visible (useful for fan or humidifier entities)
-- **Extended swing & vane modes** — `swing_horizontal`, `swing_vertical`, `vane_horizontal`, `vane_vertical` as separate control types for climate entities (Daikin, Mitsubishi, etc.)
+- **Extended swing & vane modes** — `swing_horizontal` and `swing_vertical` in the visual editor; `vane_horizontal` and `vane_vertical` via YAML for Mitsubishi/melcloud setups. Enables climate devices with directional controls (Daikin, Mitsubishi, etc.)
 - **Loading state** — card shows a shimmering placeholder on first mount instead of a spurious "Entity not available" error
 - **Unavailable entity styling** — card is greyed out and non-interactive when the climate entity is `unavailable` or `unknown`
 - **Modern build tooling** — Node 24, updated Rollup/TypeScript/Jest plugins, `strictNullChecks` enabled, CI workflows
