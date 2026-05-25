@@ -11,7 +11,7 @@
 - **`hide_setpoint`** — New config option to hide the temperature/percentage setpoint controls while keeping mode buttons visible. Useful for fan or humidifier entities where only mode selection is needed. Configurable in the visual editor under *Layout & Display*
 - **Extended swing & vane modes** — `swing_horizontal` and `swing_vertical` as new control types in the visual editor and YAML `control:` config. `vane_horizontal` and `vane_vertical` available via YAML for Mitsubishi/melcloud setups. Enables climate devices with directional vanes (Daikin, Mitsubishi, etc.) to expose all position controls
 - **Native HA formatting for mode labels** — Mode button labels now use `hass.formatEntityState()` for HVAC modes and `hass.formatEntityAttributeValue()` for all other modes. Properly localized in all HA languages; old hardcoded localization prefix strings removed
-- **OFF fallback** — Setpoint display shows "OFF" instead of "N/A" when the entity state is `off`
+- **OFF display when entity is off** — Setpoint display now always shows "OFF" when the entity state is `off`, even when the entity still reports a valid temperature in its attributes (e.g. Daikin keeping `temperature: 24` while off)
 
 ### 🐛 Bug Fixes
 
