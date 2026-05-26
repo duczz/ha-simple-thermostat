@@ -68,8 +68,6 @@ function buildSchema(config: any) {
             { name: 'show_preset', selector: { boolean: {} } },
             { name: 'show_fan', selector: { boolean: {} } },
             { name: 'show_swing', selector: { boolean: {} } },
-            { name: 'show_swing_horizontal', selector: { boolean: {} } },
-            { name: 'show_swing_vertical', selector: { boolean: {} } },
           ],
         },
         {
@@ -191,8 +189,6 @@ const LABELS: Record<string, string> = {
   show_preset: 'Preset mode',
   show_fan: 'Fan mode',
   show_swing: 'Swing mode',
-  show_swing_horizontal: 'Swing horizontal',
-  show_swing_vertical: 'Swing vertical',
   'layout.mode.names': 'Show mode names',
   'layout.mode.icons': 'Show mode icons',
   'layout.mode.headings': 'Show mode headings',
@@ -294,8 +290,6 @@ export default class SimpleThermostatEditor extends LitElement {
       show_preset: isModeEnabled(this.config, 'preset', adapter),
       show_fan: isModeEnabled(this.config, 'fan', adapter),
       show_swing: isModeEnabled(this.config, 'swing', adapter),
-      show_swing_horizontal: isModeEnabled(this.config, 'swing_horizontal', adapter),
-      show_swing_vertical: isModeEnabled(this.config, 'swing_vertical', adapter),
       name: header.name ?? '',
       icon: typeof header.icon === 'string' ? header.icon : '',
       'toggle.entity': header.toggle?.entity ?? '',
@@ -383,8 +377,6 @@ export default class SimpleThermostatEditor extends LitElement {
     if (updated.show_preset) desired.push('preset')
     if (updated.show_fan) desired.push('fan')
     if (updated.show_swing) desired.push('swing')
-    if (updated.show_swing_horizontal) desired.push('swing_horizontal')
-    if (updated.show_swing_vertical) desired.push('swing_vertical')
     const namesOff = updated['layout.mode.names'] === false
     const iconsOff = updated['layout.mode.icons'] === false
     if (namesOff && iconsOff) {
