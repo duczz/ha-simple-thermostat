@@ -541,11 +541,11 @@ export default class SimpleThermostat extends LitElement {
             return html`
               <div class="current-wrapper ${stepLayout}">
                 <ha-icon-button
-                  ?disabled=${maxTemp !== null && numericValue >= maxTemp}
+                  ?disabled=${(value === null && minTemp === null) || (value !== null && maxTemp !== null && numericValue >= maxTemp)}
                   class="thermostat-trigger"
                   aria-label="Increase ${field}"
                   .label=${`Increase ${field}`}
-                  @click="${() => this.setTemperature(this.stepSize, field)}"
+                  @click="${() => value === null ? this.setTemperature(0, field, minTemp!) : this.setTemperature(this.stepSize, field)}"
                 >
                   <ha-icon .icon=${row ? ICONS.PLUS : ICONS.UP}></ha-icon>
                 </ha-icon-button>
@@ -579,7 +579,7 @@ export default class SimpleThermostat extends LitElement {
                     : nothing}
                 </h3>
                 <ha-icon-button
-                  ?disabled=${minTemp !== null && numericValue <= minTemp}
+                  ?disabled=${value === null || (minTemp !== null && numericValue <= minTemp)}
                   class="thermostat-trigger"
                   aria-label="Decrease ${field}"
                   .label=${`Decrease ${field}`}
@@ -617,14 +617,14 @@ export default class SimpleThermostat extends LitElement {
     )
   }
 
-  setTemperature(change: number, field: string) {
+  setTemperature(change: number, field: string, baseValue?: number) {
     this._updatingValues = true
     if (this._updatingValuesTimeout) clearTimeout(this._updatingValuesTimeout)
     this._updatingValuesTimeout = setTimeout(() => {
       this._updatingValues = false
       this._updatingValuesTimeout = null
     }, UPDATING_TIMEOUT)
-    const previousValue = this._values[field]
+    const previousValue = baseValue ?? this._values[field]
     const newValue = Number(previousValue) + change
     const { decimals } = this.config
 

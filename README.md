@@ -37,6 +37,7 @@ This fork modernises [nervetattoo/simple-thermostat](https://github.com/nervetat
 - **Tap / hold / double-tap actions** — full HA-standard `tap_action`, `hold_action`, `double_tap_action` on the temperature display (more-info / none / navigate / url / toggle / call-service); configurable in the Interactions editor panel
 - **Hide setpoint controls** — `hide_setpoint: true` hides the temperature/percentage setpoint buttons while keeping mode controls visible (useful for fan or humidifier entities)
 - **OFF display** — Setpoint always shows "OFF" when the entity is off, even when the entity still reports a valid temperature (e.g. Daikin)
+- **Null temperature handling** — When an entity is off and has no target temperature (`temperature: null`), setpoint buttons are disabled unless `min_temp` is available; pressing plus then seeds the setpoint to `min_temp`
 - **Extended swing & vane modes** — `swing_horizontal`, `swing_vertical`, `vane_horizontal`, `vane_vertical` available via YAML `control:` config for climate integrations that expose these as entity attributes (e.g. native Daikin, Mitsubishi/melcloud)
 - **Loading state** — card shows a shimmering placeholder on first mount instead of a spurious "Entity not available" error
 - **Unavailable entity styling** — card is greyed out and non-interactive when the climate entity is `unavailable` or `unknown`

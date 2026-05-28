@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.5] – 2026-05-28
+
+### 🐛 Bug Fixes
+
+- **Setpoint buttons disabled when `temperature` is `null`** — When an entity is off and has no target temperature (`temperature: null`), the minus button was incorrectly disabled due to `Number(null) === 0` being less than `min_temp`. Both plus and minus are now disabled based on the value actually being `null`, not on a numeric comparison against zero
+- **Plus button seeds `min_temp` when `temperature` is `null`** — Pressing plus on an entity with `temperature: null` (and a `min_temp` attribute) now sets the temperature to `min_temp` instead of doing nothing. If no `min_temp` is available, the button remains disabled
+
 ## [2.3.4] – 2026-05-25
 
 ### ⚠️ Breaking Changes
