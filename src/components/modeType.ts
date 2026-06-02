@@ -47,8 +47,11 @@ export default function renderModeType({
     return html` <ha-icon class="mode-icon" .icon=${icon}></ha-icon> `
   }
 
-  const FALLBACK_TITLES: Record<string, string> = {
+  const CLEAN_TITLES: Record<string, string> = {
     hvac: 'Operation',
+    fan: 'Speed',
+    preset: 'Preset',
+    swing: 'Swing',
     vane_horizontal: 'Vane Horizontal',
     vane_vertical: 'Vane Vertical',
     swing_horizontal: 'Swing Horizontal',
@@ -56,13 +59,19 @@ export default function renderModeType({
     oscillating: 'Oscillation',
     direction: 'Direction',
   }
-  const str = type === 'hvac' ? 'operation' : `${type}_mode`
-  let title = name || localize(`ui.card.climate.${str}`)
-  if (title === `ui.card.climate.${str}`) {
-    const attrKey = `state_attributes.climate.${type === 'hvac' ? 'hvac' : type}_mode`
-    title = localize(attrKey)
-    if (title === attrKey) {
-      title = FALLBACK_TITLES[type] ?? 'Mode'
+  let title = name
+  if (!title) {
+    title = CLEAN_TITLES[type]
+  }
+  if (!title) {
+    const str = type === 'hvac' ? 'operation' : `${type}_mode`
+    title = localize(`ui.card.climate.${str}`)
+    if (title === `ui.card.climate.${str}`) {
+      const attrKey = `state_attributes.climate.${type === 'hvac' ? 'hvac' : type}_mode`
+      title = localize(attrKey)
+      if (title === attrKey) {
+        title = 'Mode'
+      }
     }
   }
   const headings = modeOptions?.headings ?? false
