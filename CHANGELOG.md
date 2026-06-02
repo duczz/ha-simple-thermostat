@@ -8,7 +8,7 @@
 - **`entities` Config Key Alias** — Fully supports the standard Home Assistant Lovelace config key `entities:` alongside the legacy `sensors:` key, aligning with official HA dashboard practices. A robust fallback ensures all existing dashboards using `sensors:` continue to work flawlessly.
 - **Extended Fan Controls** — Added direct support for fan direction (`direction`) and swing/oscillation (`oscillating`) controls. The fan adapter now automatically registers these controls, and the card handles boolean and list-based attributes beautifully.
 - **Custom Fan Speed Icons (Speeds 4 & 5)** — Native custom iconset `st` registered dynamically. It overlays high-quality speed number indicators directly onto the fan path for `st:fan-speed-4` and `st:fan-speed-5` seamlessly.
-- **Preset Mode Icons** — Standard presets now automatically resolve to beautiful, intuitive MDI icons (`eco` to a leaf, `boost` to a rocket, `comfort` to a sofa, `away` to an exit door, and `sleep` to a moon/sleep icon), eliminating the need for manual icon configurations in YAML.
+- **Preset Mode Icons** — Standard presets now automatically resolve to beautiful, intuitive MDI icons (`eco` to a leaf, `boost` to a rocket, `comfort` & `auto_comfort` to a sofa, `away` to an exit door, and `sleep` to a moon/sleep icon), eliminating the need for manual icon configurations in YAML.
 - **Unified Mode Sorting** — Refactored the mode sorting into a generic, powerful helper. Both HVAC modes and fan speed settings (e.g. from quiet to high/turbo, with auto/on at the end) are now logically and deterministically ordered.
 
 ## [2.3.5] – 2026-05-28
