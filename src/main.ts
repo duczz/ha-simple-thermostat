@@ -17,6 +17,7 @@ import parseHeader, { HeaderData, MODE_ICONS } from './config/header'
 import parseSetpoints from './config/setpoints'
 import parseService, { Service } from './config/service'
 import { getAdapter } from './adapters'
+import { sortModes } from './config/sort'
 
 import { CardConfig, ModeValue, ModeControlObject, MODES, TapAction } from './config/card'
 
@@ -100,44 +101,6 @@ function getModeList(
     })
 }
 
-export function sortModes(
-  type: string,
-  list: Array<ControlModeOption>
-): Array<ControlModeOption> {
-  let order: string[] = []
-  if (type === 'hvac') {
-    order = Object.values(HVAC_MODES) as Array<string>
-  } else if (type === 'fan' || type === 'preset') {
-    order = [
-      'off',
-      'quiet',
-      'silent',
-      'low',
-      'medium',
-      'high',
-      'highest',
-      'turbo',
-      'powerful',
-      'auto',
-      'automatic',
-      'on',
-    ]
-  } else {
-    return list
-  }
-
-  const known: Array<ControlModeOption> = []
-  const unknown: Array<ControlModeOption> = []
-  list.forEach((item) => {
-    const index = order.indexOf(item.value.toLowerCase())
-    if (index >= 0) {
-      known[index] = item
-    } else {
-      unknown.push(item)
-    }
-  })
-  return [...known.filter(Boolean), ...unknown]
-}
 
 interface Values {
   [key: string]: number | string

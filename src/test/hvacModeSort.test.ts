@@ -1,4 +1,4 @@
-import { sortModes } from '../main'
+import { sortModes } from '../config/sort'
 
 describe('Generic mode sorting', () => {
   describe('HVAC mode sorting', () => {

@@ -22,6 +22,7 @@ declare global {
 }
 
 const registerCustomModeIcons = () => {
+  if (typeof window === 'undefined') return
   window.customIconsets = window.customIconsets || {}
   if (window.customIconsets.st) return
 

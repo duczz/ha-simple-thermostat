@@ -578,6 +578,6 @@ control: false
 [hacs-url]: https://hacs.xyz
 [ha-badge]: https://img.shields.io/badge/Home%20Assistant-2024.8+-41BDF5.svg?style=for-the-badge&logo=homeassistant&logoColor=white
 [ha-url]: https://www.home-assistant.io
-[version-badge]: https://img.shields.io/badge/version-2.3.4-22c55e.svg?style=for-the-badge&logo=github&logoColor=white
+[version-badge]: https://img.shields.io/badge/version-2.3.6-22c55e.svg?style=for-the-badge&logo=github&logoColor=white
 [downloads-badge]: https://img.shields.io/github/downloads/duczz/ha-simple-thermostat/total.svg?style=for-the-badge&logo=github&logoColor=white&color=blueviolet
 [release-url]: https://github.com/duczz/ha-simple-thermostat
