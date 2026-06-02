@@ -43,7 +43,7 @@ export const fanAdapter: EntityAdapter = {
   },
 
   getDefaultControl(): string[] {
-    return ['preset']
+    return ['preset', 'direction', 'oscillating']
   },
 
   transformModePayloadValue(type: string, value: string) {

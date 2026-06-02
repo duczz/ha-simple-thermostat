@@ -1,8 +1,6 @@
 import { html } from 'lit'
 import { ControlMode, HVAC_MODES } from '../types'
 
-const POSITION_MODES = ['vane_horizontal', 'vane_vertical']
-
 interface ModeTypeOptions {
   state: string
   entity: any
@@ -27,7 +25,8 @@ export default function renderModeType({
     return null
   }
 
-  const modeAttribute = POSITION_MODES.includes(type) ? type : `${type}_mode`
+  const SPECIAL_ATTRIBUTES = ['vane_horizontal', 'vane_vertical', 'oscillating', 'direction']
+  const modeAttribute = SPECIAL_ATTRIBUTES.includes(type) ? type : `${type}_mode`
 
   const maybeRenderName = (name: string | false, value: string) => {
     if (name === false) return null
@@ -54,6 +53,8 @@ export default function renderModeType({
     vane_vertical: 'Vane Vertical',
     swing_horizontal: 'Swing Horizontal',
     swing_vertical: 'Swing Vertical',
+    oscillating: 'Oscillation',
+    direction: 'Direction',
   }
   const str = type === 'hvac' ? 'operation' : `${type}_mode`
   let title = name || localize(`ui.card.climate.${str}`)

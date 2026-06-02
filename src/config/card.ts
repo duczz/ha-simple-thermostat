@@ -44,6 +44,7 @@ interface CardConfig {
   header?: false | HeaderConfig
   control?: false | ModeControl | string[]
   sensors?: false | Array<ConfigSensor & TemplatedSensor>
+  entities?: false | Array<ConfigSensor & TemplatedSensor>
   version?: 2 | 3
   setpoints?: false | Setpoints
   hide_setpoint?: boolean

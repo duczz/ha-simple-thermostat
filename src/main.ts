@@ -70,6 +70,12 @@ function getModeList(
   modeAttribute: string = `${type}_modes`
 ) {
   let modeOptions = attributes[modeAttribute]
+  if (type === 'oscillating') {
+    modeOptions = ['false', 'true']
+  } else if (type === 'direction') {
+    modeOptions = ['forward', 'reverse']
+  }
+
   // Handle boolean attributes (e.g. fan oscillating)
   if (typeof modeOptions === 'boolean') {
     modeOptions = ['false', 'true']
@@ -92,6 +98,45 @@ function getModeList(
         ...values,
       }
     })
+}
+
+export function sortModes(
+  type: string,
+  list: Array<ControlModeOption>
+): Array<ControlModeOption> {
+  let order: string[] = []
+  if (type === 'hvac') {
+    order = Object.values(HVAC_MODES) as Array<string>
+  } else if (type === 'fan' || type === 'preset') {
+    order = [
+      'off',
+      'quiet',
+      'silent',
+      'low',
+      'medium',
+      'high',
+      'highest',
+      'turbo',
+      'powerful',
+      'auto',
+      'automatic',
+      'on',
+    ]
+  } else {
+    return list
+  }
+
+  const known: Array<ControlModeOption> = []
+  const unknown: Array<ControlModeOption> = []
+  list.forEach((item) => {
+    const index = order.indexOf(item.value.toLowerCase())
+    if (index >= 0) {
+      known[index] = item
+    } else {
+      unknown.push(item)
+    }
+  })
+  return [...known.filter(Boolean), ...unknown]
 }
 
 interface Values {
@@ -128,7 +173,7 @@ export default class SimpleThermostat extends LitElement {
 
   _updatingValuesTimeout: ReturnType<typeof setTimeout> | null = null
   _needsRecompute = true
-  _extTempEntity: any = null
+  _trackedStateRefs: Record<string, any> = {}
 
   // Action-handler state: detects tap vs hold vs double-tap on primary
   // interaction targets (the temperature display / header)
@@ -222,6 +267,39 @@ export default class SimpleThermostat extends LitElement {
     }
   }
 
+  _getTrackedEntities(): string[] {
+    const list = new Set<string>()
+    if (this.config?.entity) {
+      list.add(this.config.entity)
+    }
+
+    const extTempId =
+      this.config?.current_value_entity ?? this.config?.current_temperature_entity
+    if (extTempId) {
+      list.add(extTempId)
+    }
+
+    if (
+      typeof this.config?.header === 'object' &&
+      this.config.header?.toggle?.entity
+    ) {
+      list.add(this.config.header.toggle.entity)
+    }
+
+    const configSensors = this.config?.entities ?? this.config?.sensors
+    if (Array.isArray(configSensors)) {
+      configSensors.forEach((sensor) => {
+        if (typeof sensor === 'object' && sensor?.entity) {
+          list.add(sensor.entity)
+        } else if (typeof sensor === 'string') {
+          list.add(sensor)
+        }
+      })
+    }
+
+    return Array.from(list)
+  }
+
   set hass(hass: any) {
     if (!this.config?.entity || !hass?.states) {
       return
@@ -236,21 +314,22 @@ export default class SimpleThermostat extends LitElement {
       return
     }
 
-    // Short-circuit: skip full recompute when neither entity nor config changed.
-    // entity objects in hass.states are replaced by reference on every HA update
-    // for the specific entity that changed, so === is a reliable change check.
-    // Also track external temperature entity if configured.
-    const extTempId =
-      this.config.current_value_entity ?? this.config.current_temperature_entity
-    const extTempEntity = extTempId ? hass.states[extTempId] : null
-    if (
-      this.entity === entity &&
-      this._extTempEntity === extTempEntity &&
-      !this._needsRecompute
-    ) {
+    // Short-circuit: skip full recompute when neither the main entity nor
+    // any of the tracked entities changed since the last update.
+    const trackedIds = this._getTrackedEntities()
+    let hasChanges = this._needsRecompute
+
+    for (const id of trackedIds) {
+      const newState = hass.states[id]
+      if (this._trackedStateRefs[id] !== newState) {
+        hasChanges = true
+        this._trackedStateRefs[id] = newState
+      }
+    }
+
+    if (!hasChanges) {
       return
     }
-    this._extTempEntity = extTempEntity
     this._needsRecompute = false
     this.entity = entity
 
@@ -319,27 +398,20 @@ export default class SimpleThermostat extends LitElement {
 
     // Decorate mode types with active value and set to this.modes
     this.modes = controlModes.map((values) => {
-      const list = values.list ?? []
+      const list = sortModes(values.type!, values.list ?? [])
       if (values.type === MODES.HVAC) {
-        const hvacModeValues = Object.values(HVAC_MODES) as Array<string>
-        const known: Array<ControlModeOption> = []
-        const unknown: Array<ControlModeOption> = []
-        list.forEach((item: ControlModeOption) => {
-          const index = hvacModeValues.indexOf(item.value)
-          if (index >= 0) {
-            known[index] = item
-          } else {
-            unknown.push(item)
-          }
-        })
         return {
           ...values,
-          list: [...known.filter(Boolean), ...unknown],
+          list,
           mode: entity.state,
         } as ControlMode
       }
       const mode = attributes[adapter.getModePayloadKey(values.type!)]
-      return { ...values, mode: mode != null ? String(mode) : 'none' } as ControlMode
+      return {
+        ...values,
+        list,
+        mode: mode != null ? String(mode) : 'none',
+      } as ControlMode
     })
 
     if (this.config.step_size) {
@@ -353,13 +425,15 @@ export default class SimpleThermostat extends LitElement {
 
     this._hide = { ...DEFAULT_HIDE, ...this.config.hide }
 
-    if (this.config.sensors === false) {
+    const configSensors = this.config.entities ?? this.config.sensors
+
+    if (configSensors === false || this.config.sensors === false || this.config.entities === false) {
       this.showSensors = false
     } else if (this.config.version === 3) {
       this.sensors = []
-      const configSensors = this.config.sensors ?? []
+      const sensorsList = Array.isArray(configSensors) ? configSensors : []
       const mainEntityId = this.config.entity!
-      const customSensors = configSensors.map((sensor, index) => {
+      const customSensors = sensorsList.map((sensor, index) => {
         const entityId = sensor?.entity ?? mainEntityId
         let context: LooseObject | undefined = entity
         if (sensor?.entity) {
@@ -405,8 +479,8 @@ export default class SimpleThermostat extends LitElement {
         })
       }
       this.sensors = [...builtins, ...customSensors]
-    } else if (this.config.sensors) {
-      this.sensors = this.config.sensors.map(
+    } else if (configSensors) {
+      this.sensors = configSensors.map(
         ({ name, entity: sensorEntity, attribute, unit, ...rest }) => {
           let state
           const names = [name]
