@@ -18,6 +18,7 @@ import parseSetpoints from './config/setpoints'
 import parseService, { Service } from './config/service'
 import { getAdapter } from './adapters'
 import { sortModes } from './config/sort'
+import { getTrackedEntities } from './config/trackedEntities'
 
 import { CardConfig, ModeValue, ModeControlObject, MODES, TapAction } from './config/card'
 
@@ -230,39 +231,6 @@ export default class SimpleThermostat extends LitElement {
     }
   }
 
-  _getTrackedEntities(): string[] {
-    const list = new Set<string>()
-    if (this.config?.entity) {
-      list.add(this.config.entity)
-    }
-
-    const extTempId =
-      this.config?.current_value_entity ?? this.config?.current_temperature_entity
-    if (extTempId) {
-      list.add(extTempId)
-    }
-
-    if (
-      typeof this.config?.header === 'object' &&
-      this.config.header?.toggle?.entity
-    ) {
-      list.add(this.config.header.toggle.entity)
-    }
-
-    const configSensors = this.config?.entities ?? this.config?.sensors
-    if (Array.isArray(configSensors)) {
-      configSensors.forEach((sensor) => {
-        if (typeof sensor === 'object' && sensor?.entity) {
-          list.add(sensor.entity)
-        } else if (typeof sensor === 'string') {
-          list.add(sensor)
-        }
-      })
-    }
-
-    return Array.from(list)
-  }
-
   set hass(hass: any) {
     if (!this.config?.entity || !hass?.states) {
       return
@@ -279,7 +247,7 @@ export default class SimpleThermostat extends LitElement {
 
     // Short-circuit: skip full recompute when neither the main entity nor
     // any of the tracked entities changed since the last update.
-    const trackedIds = this._getTrackedEntities()
+    const trackedIds = getTrackedEntities(this.config)
     let hasChanges = this._needsRecompute
 
     for (const id of trackedIds) {

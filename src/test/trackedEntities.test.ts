@@ -1,31 +1,25 @@
-import SimpleThermostat from '../main'
+import { getTrackedEntities } from '../config/trackedEntities'
 
-describe('SimpleThermostat state tracking', () => {
-  let card: SimpleThermostat
-
-  beforeEach(() => {
-    card = new SimpleThermostat()
-  })
-
+describe('getTrackedEntities helper', () => {
   test('tracks primary entity and nothing else by default', () => {
-    card.config = { entity: 'climate.living_room' }
-    const tracked = card._getTrackedEntities()
+    const config = { entity: 'climate.living_room' }
+    const tracked = getTrackedEntities(config)
     expect(tracked).toEqual(['climate.living_room'])
   })
 
   test('tracks external temperature entities', () => {
-    card.config = {
+    const config = {
       entity: 'climate.living_room',
       current_value_entity: 'sensor.living_room_temp',
     }
-    const tracked = card._getTrackedEntities()
+    const tracked = getTrackedEntities(config)
     expect(tracked).toContain('climate.living_room')
     expect(tracked).toContain('sensor.living_room_temp')
     expect(tracked).toHaveLength(2)
   })
 
   test('tracks header toggle entity', () => {
-    card.config = {
+    const config = {
       entity: 'climate.living_room',
       header: {
         toggle: {
@@ -33,21 +27,21 @@ describe('SimpleThermostat state tracking', () => {
         },
       },
     }
-    const tracked = card._getTrackedEntities()
+    const tracked = getTrackedEntities(config)
     expect(tracked).toContain('climate.living_room')
     expect(tracked).toContain('switch.living_room_ac_power')
     expect(tracked).toHaveLength(2)
   })
 
   test('tracks configured entities and sensors arrays', () => {
-    card.config = {
+    const config = {
       entity: 'climate.living_room',
       entities: [
         'sensor.outdoor_temp',
         { entity: 'sensor.window_state' },
       ],
     }
-    const tracked = card._getTrackedEntities()
+    const tracked = getTrackedEntities(config)
     expect(tracked).toContain('climate.living_room')
     expect(tracked).toContain('sensor.outdoor_temp')
     expect(tracked).toContain('sensor.window_state')
@@ -55,7 +49,7 @@ describe('SimpleThermostat state tracking', () => {
   })
 
   test('deduplicates entities in the tracking list', () => {
-    card.config = {
+    const config = {
       entity: 'climate.living_room',
       current_value_entity: 'climate.living_room', // same
       entities: [
@@ -64,7 +58,7 @@ describe('SimpleThermostat state tracking', () => {
         'sensor.outdoor_temp', // duplicate
       ],
     }
-    const tracked = card._getTrackedEntities()
+    const tracked = getTrackedEntities(config)
     expect(tracked).toEqual(['climate.living_room', 'sensor.outdoor_temp'])
   })
 })
