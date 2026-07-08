@@ -22,9 +22,10 @@ A beautiful, highly customizable thermostat card for Home Assistant. Seamlessly 
   <img src="assets/full.png" width="90%" alt="Full card with banners and sensors">
 </p>
 <p align="center">
-  <img src="assets/control.png" width="42%" alt="All control / mode options">
-  &nbsp;&nbsp;
-  <img src="assets/small.png" width="42%" alt="Compact layout">
+  <img src="assets/control.png" width="45%" alt="All control / mode options">
+</p>
+<p align="center">
+  <img src="assets/small.png" width="55%" alt="Compact layout">
 </p>
 
 ---
