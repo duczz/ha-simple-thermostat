@@ -1,8 +1,8 @@
 # Dependencies
 node_modules
 
-# Debug build artifacts
-dist/*.debug.js
+# Build artifacts
+dist/
 
 
 # Test coverage
@@ -31,6 +31,7 @@ Desktop.ini
 *.swp
 *.swo
 
-# Local-only AI assistant notes (lives in PersonalOS brain too)
+# Local-only - PersonalOS
 CLAUDE.md
+CLAUDE.local.md
 .claude/

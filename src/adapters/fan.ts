@@ -3,8 +3,10 @@ import { EntityAdapter, Range, SetpointService } from './types'
 
 export const fanAdapter: EntityAdapter = {
   getSetpoints(attributes: LooseObject): Record<string, any> {
+    // Only expose percentage if the entity actually supports it
+    if (attributes?.percentage == null) return {}
     return {
-      percentage: attributes?.percentage,
+      percentage: attributes.percentage,
     }
   },
 

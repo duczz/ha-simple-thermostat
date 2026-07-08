@@ -1,5 +1,55 @@
 # Changelog
 
+## [2.4.0] – 2026-07-08
+
+### ✨ New Features (Fork-Exclusive)
+
+- **Advanced Banner System (`banners`)** — Designed and implemented a completely original, ground-up Banner engine exclusive to this fork. Featuring a custom modern "Accent Left-Border" design, banners support rich conditions (`entity`, `attribute`, `state`, `above`, `below`), text templating (`{{value}}`), and automatic priority sorting (Error > Warning > Info > Success). The visual editor now includes an independent configuration panel with 1-click generation for common alerts.
+- **Chips & Badges Sensor Layouts** — Introduced two entirely new layout engines (`chips` and `badges`) designed specifically for this repository. They seamlessly integrate with Home Assistant's native styling, built on a robust and proprietary CSS Flexbox architecture that uniquely sets this version apart.
+
+### ✨ Additional Features
+
+- **Interactive Sensors (`display_as`)** — An original UX concept that transforms static text sensors into fully interactive widgets! Using a rendering layer engineered entirely independently from the main project, you can now render sensors as Toggle Switches (`switch`), Sliders (`slider`), or Select Dropdowns (`select`).
+- **Sensor Editor Architecture Overhaul** — A completely redesigned, custom configuration UI architecture. Sensors are now neatly organised within their own expansion panel, featuring intuitive inline options to manage our new state color engines seamlessly.
+- **Sensor State Colors (`state_color` & `state_text_color`)** — We've engineered a custom evaluation logic that allows dynamic CSS color injection for both icons and text based on exact state matches. This entirely independent feature brings dynamic, state-aware coloring to your sensors directly from our overhauled UI.
+- **Sensor Base Color** — You can now assign a static icon color (`color`) for custom sensors directly in the visual editor.
+- **Right-Aligned Step Controls (`layout.step: right`)** — Added a new `right` option for the `layout.step` configuration. This new option allows you to position the temperature adjustment buttons (plus/minus) neatly to the right of the current temperature display for a more compact and streamlined look.
+
+### ✨ Improvements
+
+- **Editor Mode Sort Order** — `swing_vertical` now correctly appears before `swing_horizontal` in the visual editor for better usability.
+- **Visual Editor YAML Serialization** — The visual editor now saves the `control` modes as a YAML dictionary (`hvac:`, `preset:`) instead of a list (`- hvac`, `- preset`). This makes it vastly easier to manually add custom names and icons in the code editor without having to restructure the YAML syntax.
+- **Custom Mode Override Resiliency** — The card now safely handles empty YAML mode keys (e.g., `hvac:` with nothing beneath it), preventing the UI from crashing with null destructuring errors.
+- **Refined Mode Icons** — Updated the default icons for `normal` (`mdi:scale-balance`), `powerful` (`mdi:lightning-bolt`), and `quiet`/`silent` (`mdi:feather`) to be more visually distinct from the standard fan speed icons.
+- **Mode Sorting** — Added `auto comfort` and `normal` to the internal sorting logic to ensure these modes are ordered correctly.
+
+### 🐛 Bug Fixes
+
+- **Lifecycle Race Condition** — Fixed an issue where the card could fail to render correctly or update if Home Assistant data arrived before the card's configuration (`setConfig` vs `set hass` synchronization).
+- **Attribute Initialization Crash** — Fixed a `TypeError` crash caused by missing `attributes` objects when Home Assistant transiently provides incomplete entity states.
+- **Sensor Table Layout Integrity** — Fixed an issue where interactive sensors without labels would break the CSS grid alignment in `table` layout mode.
+- **"Entity Not Available" Flickering (Grace Period)** — Fixed an annoying issue where the card would completely destroy its layout and flash an "Entity not available" error whenever an integration reloaded or briefly disconnected in the background. The card now implements a smart 5-second "Grace Period" where it preserves the last known valid state, completely eliminating UI flickering while still correctly reporting true configuration errors.
+- **Custom Mode Names (`name`)** — Fixed a bug where explicitly provided custom `name` overrides in the `control:` configuration were being ignored and overwritten by Home Assistant's default translations. The card now correctly prioritizes the user's custom `name`.
+- **`getTrackedEntities` object extraction** — Fixed state tracking to properly extract entities when custom sensors are configured using the object format (`sensors: [{entity: "..."}]`) under config version 3, ensuring live updates for these sensors work reliably.
+- **YAML Override Bug** — Fixed a long-standing issue where using the visual editor to modify `sensors` would be completely ignored if the legacy `entities` key was still present in the underlying YAML configuration. The card now correctly prioritizes the configuration.
+- **Visual Editor Stability** — The sensor configuration form now actively validates your `display_as` selection. If you change a sensor's entity to an incompatible domain, the widget type automatically resets to a safe default, preventing UI glitches.
+- **Visual Editor Add Button** — Adjusted CSS grid constraints (`min-width: 0`) in the editor so that the "Add Sensor" (+) button no longer overflows the container on small window sizes.
+- **Sensor List Layout Overflow** — Completely overhauled the `.sensors.as-list` CSS structure to use Flexbox (`flex-direction: column`) instead of CSS Grid. This definitively prevents horizontal text overflowing when long sensor strings are placed inside tight layout containers.
+- **Interactive Widgets in Chips** — Fixed an issue where the new `display_as` interactive widgets inside `chips` layout would trigger the details popover of the entire chip when clicked. The chip's label/icon now safely triggers the details popover, while the widget itself remains fully functional without bubbling.
+- **Defensive Type Safety (`null` & `undefined`)** — Implemented highly robust nullish coalescing checks across the codebase to prevent `TypeError` UI crashes when `state` is explicitly `null` or when a custom Template Sensor does not map an underlying `entity`.
+- **Fault Icon Live Updates** — Header `faults` entities are now part of the tracked-entity list introduced in 2.3.6, so fault icons update live instead of freezing until an unrelated tracked entity changes.
+- **Editor Live Preview State** — Removing `sensors:`, `step_size:` or a `sensors: false` flag from the config now correctly resets the card state in the live preview (previously the old values could stick until a reload).
+- **Localized Current Temperature** — The "Currently" sensor value now respects the HA number format (comma locales) just like the setpoint display.
+- **`translate` Template Filter** — The v3 template filter `{{value|translate}}` built a doubled translation key when used without a prefix and therefore always returned the raw value. It now resolves `state_attributes.<domain>.<value>` correctly (explicit prefixes are unchanged).
+- **Mode Toggle Reset Bug** — Turning on all five "Show preset/fan/swing/vert. swing/horiz. swing" toggles in the visual editor (for an entity where none of them are shown by default, e.g. a plain climate) silently deleted the entire `control:` config and reset every toggle back to off. Fixed the underlying check that decides whether `control:` needs to be saved at all.
+- **Header Name/Icon/Toggle/Faults Lost on Toggle** — Turning the header off and back on in the visual editor dropped the header's name, icon, toggle, and `faults` (previously only `faults` was fixed — the name/icon/toggle form fields looked unaffected but silently went blank while the header was hidden and wiped themselves on re-enable). The editor now remembers and restores the full header when re-enabled, while still letting you intentionally clear a field.
+- **Lifecycle Race Condition (follow-up)** — The earlier fix above didn't cover every path: if `hass` was assigned before `setConfig` was ever called, the very first render pass (LitElement always renders once after connecting, regardless of property changes) crashed with `TypeError: Cannot read properties of undefined (reading 'decimals')`. `render()` now guards on a missing config before touching it.
+- **Setpoint Change Lost on Quick Navigation** — Changing the temperature and navigating away within the 500ms debounce window silently dropped the change (the pending service call was cancelled instead of sent). It's now flushed immediately when the card is removed from the DOM.
+
+### 🔒 Security
+
+- **XSS Hardening in `version: 3` Templates** — Templated sensors render with HTML auto-escaping disabled (needed for filters like `icon`/`css`/`relativetime` to produce real markup) and inject the result via `unsafeHTML`. Entity-derived values (attributes, state) reflected into a template — including the default sensor label `{{friendly_name}}` — are now HTML-escaped before templating, so a name/attribute value that happens to contain markup (e.g. mirrored from an external cloud/device integration) can no longer inject real HTML/JS into the dashboard. Custom templates using the built-in filters are unaffected.
+
 ## [2.3.6] – 2026-06-02
 
 ### ✨ New Features

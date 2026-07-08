@@ -51,7 +51,7 @@ export const climateAdapter: EntityAdapter = {
   },
 
   getDefaultControl(): string[] {
-    return ['hvac', 'preset']
+    return ['hvac']
   },
 
   getLocalizationDomain(): string {

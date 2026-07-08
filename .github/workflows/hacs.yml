@@ -11,20 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build
-        run: npm run build
-
-      - name: Prepare for HACS validation
-        run: cp dist/simple-thermostat.js .
-
+      # No build needed: with releases present, HACS validation checks the
+      # latest release asset (simple-thermostat.js), not the checkout.
       - name: HACS validation
         uses: hacs/action@main
         with:

@@ -1,5 +1,3 @@
-import { HeaderConfig } from './config/header'
-
 export type LooseObject = Record<string, any>
 
 export interface ConfigSensor {
@@ -13,6 +11,11 @@ export interface ConfigSensor {
   template?: string
   show?: boolean
   type?: 'relativetime' | 'template'
+  color?: string
+  text_color?: string
+  state_color?: Record<string, string>
+  state_text_color?: Record<string, string>
+  display_as?: 'state' | 'switch' | 'slider' | 'select'
 }
 
 export interface TemplatedSensor {
@@ -24,10 +27,12 @@ export interface TemplatedSensor {
 export interface PreparedSensor {
   id: string
   label: string | false
+  icon?: string | boolean
   entityId: string
   template: string
   show: boolean
   context: LooseObject | undefined
+  display_as?: 'state' | 'switch' | 'slider' | 'select'
 }
 
 export interface Sensor extends ConfigSensor {
@@ -51,8 +56,8 @@ export enum HVAC_MODES {
 
 export interface ControlModeOption {
   value: string
-  name: string
-  icon: string
+  name?: string | false
+  icon?: string
 }
 export interface ControlMode {
   type: string
@@ -60,4 +65,16 @@ export interface ControlMode {
   name?: string | boolean
   hide_when_off?: boolean
   list: Array<ControlModeOption>
+}
+
+export interface BannerConfig {
+  entity?: string
+  attribute?: string
+  state?: string | string[]
+  state_not?: string | string[]
+  below?: number
+  above?: number
+  text?: string
+  type?: 'warning' | 'error' | 'info' | 'success'
+  icon?: string
 }

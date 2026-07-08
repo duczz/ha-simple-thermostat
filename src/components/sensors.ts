@@ -14,12 +14,10 @@ export default function renderSensors({
   localize,
   openEntityPopover,
 }) {
-  const {
-    attributes: { hvac_action: action },
-  } = entity
+  const action = entity.attributes?.hvac_action
 
   const adapter = getAdapter(config?.entity)
-  const adapterCurrent = adapter.getCurrentValue(entity.attributes)
+  const adapterCurrent = adapter.getCurrentValue(entity.attributes ?? {})
 
   // External temperature entity override (e.g. a room thermometer)
   const extTempId =
@@ -32,28 +30,52 @@ export default function renderSensors({
   let stateString = hass.formatEntityState(entity)
   if (action) {
     const actionLabel = hass.formatEntityAttributeValue(entity, 'hvac_action', action)
-    stateString = [actionLabel, ` (${stateString})`].join('')
+    if (actionLabel && actionLabel.toLowerCase() !== stateString.toLowerCase()) {
+      stateString = [actionLabel, ` (${stateString})`].join('')
+    } else {
+      stateString = actionLabel || stateString
+    }
   }
   const sensorHtml = [
     renderInfoItem({
       hide: _hide.temperature,
-      state: `${formatNumber(current, config)}${unit || ''}`,
+      // Pass hass.locale so the current value uses the same decimal
+      // separator as the setpoint display (comma locales)
+      state: `${formatNumber(current, { ...config, locale: hass?.locale })}${unit || ''}`,
       hass,
+      openEntityPopover,
+      layoutType: config?.layout?.sensors?.type,
       details: {
+        entity: config.entity,
         heading: showLabels
           ? config?.label?.temperature ?? localize(`ui.card.${domain}.currently`)
           : false,
+        icon: config?.icon?.temperature,
+        color: config?.color?.temperature,
+        text_color: (config as any)?.text_color?.temperature,
+        state_color: (config as any)?.state_color?.temperature,
+        state_text_color: (config as any)?.state_text_color?.temperature,
+        rawState: String(current),
       },
     }),
     renderInfoItem({
       hide: _hide.state,
       state: stateString,
       hass,
+      openEntityPopover,
+      layoutType: config?.layout?.sensors?.type,
       details: {
+        entity: config.entity,
         heading: showLabels
           ? config?.label?.state ??
-            localize('ui.panel.lovelace.editor.card.generic.state')
+          localize('ui.panel.lovelace.editor.card.generic.state')
           : false,
+        icon: config?.icon?.state,
+        color: config?.color?.state,
+        text_color: (config as any)?.text_color?.state,
+        state_color: (config as any)?.state_color?.state,
+        state_text_color: (config as any)?.state_text_color?.state,
+        rawState: entity.state,
       },
     }),
     ...sensors.map(({ name, state, ...rest }) => {
@@ -61,6 +83,7 @@ export default function renderSensors({
         state,
         hass,
         openEntityPopover,
+        layoutType: config?.layout?.sensors?.type,
         details: {
           ...rest,
           heading: showLabels && name,

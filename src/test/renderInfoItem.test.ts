@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import renderInfoItem from '../components/infoItem'
 import { render } from 'lit'
 
@@ -41,6 +42,65 @@ test('render into dom', () => {
   expect(value).toBe(spec.value)
 })
 
+test('badges layout: only the outer pill is clickable (no double popover)', () => {
+  const openEntityPopover = vi.fn()
+  const stateObj = {
+    entity_id: 'sensor.humidity',
+    state: '55',
+    attributes: { friendly_name: 'Humidity' },
+  }
+  const result = renderInfoItem({
+    hide: false,
+    hass: { states: {}, formatEntityState: () => '55 %' },
+    state: stateObj,
+    layoutType: 'badges',
+    openEntityPopover,
+    details: { heading: 'Humidity', entity: 'sensor.humidity' },
+  })
+
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  render(result, container)
+
+  const badge = container.querySelector('.st-badge')!
+  expect(badge.classList.contains('clickable')).toBe(true)
+
+  const valueCell = container.querySelector('.sensor-value')!
+  expect(valueCell.classList.contains('clickable')).toBe(false)
+
+  // A click on the value bubbles to the badge — the popover must fire once
+  valueCell.dispatchEvent(new Event('click', { bubbles: true }))
+  expect(openEntityPopover).toHaveBeenCalledTimes(1)
+  container.remove()
+})
+
+test('chips layout: value cell stays non-clickable', () => {
+  const openEntityPopover = vi.fn()
+  const stateObj = {
+    entity_id: 'sensor.humidity',
+    state: '55',
+    attributes: {},
+  }
+  const result = renderInfoItem({
+    hide: false,
+    hass: { states: {}, formatEntityState: () => '55 %' },
+    state: stateObj,
+    layoutType: 'chips',
+    openEntityPopover,
+    details: { heading: 'Humidity', entity: 'sensor.humidity' },
+  })
+
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  render(result, container)
+
+  const valueCell = container.querySelector('.sensor-value')!
+  expect(valueCell.classList.contains('clickable')).toBe(false)
+  valueCell.dispatchEvent(new Event('click', { bubbles: true }))
+  expect(openEntityPopover).toHaveBeenCalledTimes(1)
+  container.remove()
+})
+
 test('render with icon', () => {
   const spec = {
     heading: 'Temperature',
@@ -62,4 +122,28 @@ test('render with icon', () => {
   expect(iconEl).not.toBeNull()
   expect(iconEl.icon).toBe('test')
   expect(value).toBe(spec.value)
+})
+
+test('a timer.* sensor auto-renders the countdown widget without display_as configured', () => {
+  const stateObj = {
+    entity_id: 'timer.laundry',
+    state: 'active',
+    attributes: { finishes_at: '2026-07-05T12:02:00.000Z' },
+  }
+  const result = renderInfoItem({
+    hide: false,
+    hass: {},
+    state: stateObj,
+    // no details.display_as — v2 must still auto-detect the timer domain
+    details: { heading: 'Laundry' },
+  })
+
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  render(result, container)
+
+  const widget = container.querySelector('simple-thermostat-timer-remaining') as any
+  expect(widget).not.toBeNull()
+  expect(widget.stateObj).toEqual({ state: 'active', attributes: stateObj.attributes })
+  container.remove()
 })

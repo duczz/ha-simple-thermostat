@@ -31,8 +31,15 @@ function formatNumber(
     return value.toFixed(decimals)
   }
 
-  if (locale.number_format === 'decimal_comma' || locale.number_format === 'space_comma') {
+  if (locale.number_format === 'decimal_comma') {
     return value.toFixed(decimals).replace('.', ',')
+  }
+
+  if (locale.number_format === 'space_comma') {
+    return new Intl.NumberFormat('fr-FR', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(value)
   }
 
   if (locale.number_format === 'comma_decimal' || locale.number_format === 'none') {

@@ -1,5 +1,5 @@
 import { HeaderConfig } from './header'
-import { LooseObject, ConfigSensor, TemplatedSensor } from '../types'
+import { LooseObject, ConfigSensor, TemplatedSensor, BannerConfig } from '../types'
 import { Service } from './service'
 import { Setpoints } from './setpoints'
 
@@ -23,6 +23,7 @@ export type ModeValue = {
 export type ModeControlObject = Record<string, boolean | ModeValue> & {
   _name: string
   _hide_when_off: boolean
+  entity?: string
 }
 
 export type ModeControlValue = boolean | ModeControlObject
@@ -46,6 +47,7 @@ interface CardConfig {
   sensors?: false | Array<ConfigSensor & TemplatedSensor>
   entities?: false | Array<ConfigSensor & TemplatedSensor>
   version?: 2 | 3
+  banners?: false | Array<BannerConfig>
   setpoints?: false | Setpoints
   hide_setpoint?: boolean
   decimals?: number
@@ -58,10 +60,10 @@ interface CardConfig {
       headings?: boolean
     }
     sensors?: {
-      type?: 'table' | 'list'
+      type?: 'table' | 'list' | 'chips' | 'badges'
       labels?: boolean
     }
-    step?: 'row' | 'column'
+    step?: 'row' | 'column' | 'right'
   }
   unit?: boolean | string
   fallback?: string
@@ -71,9 +73,33 @@ interface CardConfig {
     temperature?: boolean
     state?: boolean
   }
+  icon?: {
+    temperature?: string
+    state?: string
+  }
   label?: {
     temperature?: string
     state?: string
+  }
+  color?: {
+    temperature?: string
+    state?: string
+    [key: string]: string | undefined
+  }
+  text_color?: {
+    temperature?: string
+    state?: string
+    [key: string]: string | undefined
+  }
+  state_color?: {
+    temperature?: Record<string, string>
+    state?: Record<string, string>
+    [key: string]: Record<string, string> | undefined
+  }
+  state_text_color?: {
+    temperature?: Record<string, string>
+    state?: Record<string, string>
+    [key: string]: Record<string, string> | undefined
   }
   tap_action?: TapAction
   hold_action?: TapAction

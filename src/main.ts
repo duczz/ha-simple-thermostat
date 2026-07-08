@@ -1,5 +1,5 @@
 import { LitElement, html, nothing, PropertyValues, TemplateResult } from 'lit'
-import { state } from 'lit/decorators.js'
+import { state, property } from 'lit/decorators.js'
 import debounce from 'debounce-fn'
 import { name as CARD_NAME } from '../package.json'
 
@@ -12,6 +12,7 @@ import renderHeader from './components/header'
 import renderTemplated, { wrapSensors } from './components/templated'
 import renderSensors from './components/sensors'
 import renderModeType from './components/modeType'
+import renderBanners from './components/banners'
 
 import parseHeader, { HeaderData, MODE_ICONS } from './config/header'
 import parseSetpoints from './config/setpoints'
@@ -96,7 +97,11 @@ function getModeList(
       return {
         icon: MODE_ICONS[modeKey] ?? MODE_ICONS[modeKey.toLowerCase()],
         value: modeKey,
-        name: modeKey,
+        // No default `name` here on purpose: leaving it undefined lets
+        // modeType.ts localize the label via hass.formatEntityState /
+        // formatEntityAttributeValue. Setting `name: modeKey` would shadow that
+        // (maybeRenderName returns early on any non-undefined name) and render
+        // the raw state key (e.g. "heat") instead of the localized label.
         ...values,
       }
     })
@@ -138,6 +143,8 @@ export default class SimpleThermostat extends LitElement {
   _updatingValuesTimeout: ReturnType<typeof setTimeout> | null = null
   _needsRecompute = true
   _trackedStateRefs: Record<string, any> = {}
+  _entityGraceTimer: ReturnType<typeof setTimeout> | null = null
+  static ENTITY_GRACE_MS = 5000
 
   // Action-handler state: detects tap vs hold vs double-tap on primary
   // interaction targets (the temperature display / header)
@@ -148,14 +155,25 @@ export default class SimpleThermostat extends LitElement {
   static HOLD_MS = 500
   static DOUBLE_TAP_MS = 250
 
+  // Tracks whether a debounced setTemperature call is still waiting to fire.
+  // `debounce-fn` only exposes `.cancel()`, not `.flush()` — we track this
+  // ourselves so disconnectedCallback can send the pending value immediately
+  // instead of silently dropping it (see _performCleanup).
+  _pendingSetTemperature = false
+
+  _sendSetTemperature(values: object) {
+    const { domain, service, data = {} } = this.service
+    this._callAction(`${domain}.${service}`, {
+      entity_id: this.config.entity,
+      ...data,
+      ...values,
+    })
+  }
+
   _debouncedSetTemperature = debounce(
     (values: object) => {
-      const { domain, service, data = {} } = this.service
-      this._callAction(`${domain}.${service}`, {
-        entity_id: this.config.entity,
-        ...data,
-        ...values,
-      })
+      this._pendingSetTemperature = false
+      this._sendSetTemperature(values)
     },
     {
       wait: DEBOUNCE_TIMEOUT,
@@ -195,10 +213,33 @@ export default class SimpleThermostat extends LitElement {
     }
     this.service = parseService(this.config.service ?? false, getAdapter(this.config.entity))
     this._needsRecompute = true
+
+    if (this._hass?.states) {
+      this.updateFromHass(this._hass)
+    }
+  }
+
+  private _disconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly DISCONNECT_GRACE_MS = 300;
+
+  connectedCallback() {
+    super.connectedCallback()
+    if (this._disconnectTimer) {
+      clearTimeout(this._disconnectTimer)
+      this._disconnectTimer = null
+    }
   }
 
   disconnectedCallback() {
     super.disconnectedCallback()
+    this._disconnectTimer = setTimeout(() => {
+      this._performCleanup()
+    }, this.DISCONNECT_GRACE_MS)
+  }
+
+  private _performCleanup() {
+    if (this.isConnected) return
+    
     if (this._updatingValuesTimeout) {
       clearTimeout(this._updatingValuesTimeout)
       this._updatingValuesTimeout = null
@@ -210,6 +251,17 @@ export default class SimpleThermostat extends LitElement {
     if (this._clickTimer) {
       clearTimeout(this._clickTimer)
       this._clickTimer = null
+    }
+    if (this._entityGraceTimer) {
+      clearTimeout(this._entityGraceTimer)
+      this._entityGraceTimer = null
+    }
+    // Flush instead of drop: if the user changed the setpoint and navigated
+    // away before the 500ms debounce fired, send it now rather than losing
+    // the change silently.
+    if (this._pendingSetTemperature) {
+      this._pendingSetTemperature = false
+      this._sendSetTemperature(this._values)
     }
     this._debouncedSetTemperature?.cancel?.()
   }
@@ -232,17 +284,37 @@ export default class SimpleThermostat extends LitElement {
   }
 
   set hass(hass: any) {
-    if (!this.config?.entity || !hass?.states) {
+    this._hass = hass
+
+    if (!hass?.states) {
       return
     }
 
-    this._hass = hass
+    this.updateFromHass(hass)
+  }
+
+  updateFromHass(hass: any) {
+    if (!this.config?.entity) {
+      return
+    }
+
     const entity = hass.states[this.config.entity]
 
-    // Reset entity when it disappears so render() shows the error state
     if (!entity) {
-      if (this.entity !== undefined) this.entity = undefined
+      // Grace period: keep the last known state visible for a few seconds so
+      // integration reloads / short disconnects don't flash "Entity not
+      // available". A truly missing entity (never seen) errors immediately.
+      if (this.entity !== undefined && this._entityGraceTimer === null) {
+        this._entityGraceTimer = setTimeout(() => {
+          this._entityGraceTimer = null
+          this.entity = undefined
+        }, SimpleThermostat.ENTITY_GRACE_MS)
+      }
       return
+    }
+    if (this._entityGraceTimer !== null) {
+      clearTimeout(this._entityGraceTimer)
+      this._entityGraceTimer = null
     }
 
     // Short-circuit: skip full recompute when neither the main entity nor
@@ -270,7 +342,8 @@ export default class SimpleThermostat extends LitElement {
       hass
     )
 
-    const attributes = entity.attributes
+    // HA can transiently deliver states without an attributes object
+    const attributes = entity.attributes ?? {}
     const adapter = getAdapter(this.config.entity)
 
     let values = parseSetpoints(this.config.setpoints, attributes, adapter)
@@ -291,13 +364,63 @@ export default class SimpleThermostat extends LitElement {
     }
 
     const defaultControl = adapter.getDefaultControl()
-    const supportedModeType = (type: string) =>
-      attributes[adapter.getModeAttribute(type)] !== undefined
+
+    const getOverrideConfig = (type: string) => {
+      const modeConfig = (this.config.control as LooseObject)?.[type]
+      return modeConfig && typeof modeConfig === 'object' && typeof modeConfig.entity === 'string'
+        ? modeConfig
+        : undefined
+    }
+
+    const supportedModeType = (type: string) => {
+      if (getOverrideConfig(type)) return true
+      return attributes[adapter.getModeAttribute(type)] !== undefined
+    }
+
+    const getModeListImpl = (
+      type: string,
+      attributes: LooseObject,
+      specification: Partial<ModeControlObject> = {},
+      modeAttribute: string = `${type}_modes`
+    ) => {
+      const overrideConfig = getOverrideConfig(type)
+      if (overrideConfig) {
+        const overrideEntity = hass.states[overrideConfig.entity]
+        if (!overrideEntity || overrideEntity.state === 'unavailable' || overrideEntity.state === 'unknown') return []
+
+        let modeOptions: string[] = []
+        const [domain] = overrideEntity.entity_id.split('.')
+
+        if (domain === 'select' || domain === 'input_select') {
+          const options = overrideEntity.attributes?.options
+          modeOptions = Array.isArray(options) ? options.map(String) : []
+        } else if (domain === 'switch' || domain === 'input_boolean') {
+          modeOptions = ['off', 'on']
+        }
+
+        if (!Array.isArray(modeOptions) || modeOptions.length === 0) return []
+
+        return modeOptions
+          .filter((modeOption) => shouldShowModeControl(modeOption, specification))
+          .map((modeOption) => {
+            const modeKey = String(modeOption)
+            const values = typeof specification[modeKey] === 'object' ? specification[modeKey] : {}
+            return {
+              icon: MODE_ICONS[modeKey] ?? MODE_ICONS[modeKey.toLowerCase()],
+              value: modeKey,
+              name: modeKey,
+              ...values,
+            } as ControlModeOption
+          })
+      }
+      return getModeList(type, attributes, specification, modeAttribute)
+    }
+
     const buildBasicModes = (items: any) => {
       return items.filter(supportedModeType).map((type: string) => ({
         type,
         hide_when_off: false,
-        list: getModeList(type, attributes, {}, adapter.getModeAttribute(type)),
+        list: getModeListImpl(type, attributes, {}, adapter.getModeAttribute(type)),
       }))
     }
 
@@ -310,14 +433,14 @@ export default class SimpleThermostat extends LitElement {
       const entries = Object.entries(this.config.control)
       if (entries.length > 0) {
         controlModes = entries
-          .filter(([type]) => supportedModeType(type))
+          .filter(([type, definition]: [string, any]) => supportedModeType(type) && definition !== false && definition?._hidden !== true)
           .map(([type, definition]: [string, ModeControlObject]) => {
-            const { _name, _hide_when_off, ...controlField } = definition
+            const { _name, _hide_when_off, _hidden, ...controlField } = definition
             return {
               type,
               hide_when_off: _hide_when_off,
               name: _name,
-              list: getModeList(type, attributes, controlField, adapter.getModeAttribute(type)),
+              list: getModeListImpl(type, attributes, controlField, adapter.getModeAttribute(type)),
             }
           })
       } else {
@@ -337,7 +460,16 @@ export default class SimpleThermostat extends LitElement {
           mode: entity.state,
         } as ControlMode
       }
-      const mode = attributes[adapter.getModePayloadKey(values.type!)]
+
+      const overrideConfig = getOverrideConfig(values.type!)
+      let mode: any
+      if (overrideConfig) {
+        const overrideEntity = hass.states[overrideConfig.entity]
+        mode = overrideEntity ? overrideEntity.state : 'none'
+      } else {
+        mode = attributes[adapter.getModePayloadKey(values.type!)]
+      }
+
       return {
         ...values,
         list,
@@ -349,17 +481,20 @@ export default class SimpleThermostat extends LitElement {
       this.stepSize = +this.config.step_size
     } else {
       const adapterStep = adapter.getRange(attributes).step
-      if (adapterStep != null) {
-        this.stepSize = +adapterStep
-      }
+      this.stepSize = adapterStep != null ? +adapterStep : STEP_SIZE
     }
 
     this._hide = { ...DEFAULT_HIDE, ...this.config.hide }
 
-    const configSensors = this.config.entities ?? this.config.sensors
+    // `sensors` wins over the `entities` alias when both are present — the
+    // visual editor writes `sensors`, so its changes must take effect even
+    // if a legacy `entities` key is still in the YAML.
+    const configSensors = this.config.sensors ?? this.config.entities
 
-    if (configSensors === false || this.config.sensors === false || this.config.entities === false) {
-      this.showSensors = false
+    this.showSensors = !(configSensors === false || this.config.sensors === false || this.config.entities === false)
+
+    if (!this.showSensors) {
+      this.sensors = []
     } else if (this.config.version === 3) {
       this.sensors = []
       const sensorsList = Array.isArray(configSensors) ? configSensors : []
@@ -372,9 +507,11 @@ export default class SimpleThermostat extends LitElement {
         }
         return {
           id: sensor?.id ?? String(index),
-          label: sensor?.label,
+          label: sensor?.label ?? sensor?.name,
+          icon: sensor?.icon,
           template: sensor?.template ?? '',
           show: sensor?.show !== false,
+          display_as: sensor?.display_as,
           entityId,
           context,
         } as PreparedSensor
@@ -421,9 +558,12 @@ export default class SimpleThermostat extends LitElement {
             if (attribute) {
               state = state?.attributes?.[attribute]
             }
-          } else if (attribute && attribute in attributes) {
-            state = attributes[attribute]
-            names.push(attribute)
+          } else {
+            const attrs = this.entity?.attributes ?? {}
+            if (attribute && attribute in attrs) {
+              state = attrs[attribute]
+              names.push(attribute)
+            }
           }
           names.push(sensorEntity)
 
@@ -436,6 +576,10 @@ export default class SimpleThermostat extends LitElement {
           } as Sensor
         }
       )
+    } else {
+      // No sensors configured (anymore) — drop previously computed ones so
+      // removing the last sensor in the editor takes effect immediately.
+      this.sensors = []
     }
   }
 
@@ -445,6 +589,15 @@ export default class SimpleThermostat extends LitElement {
   }
 
   render() {
+    // LitElement performs one render pass right after connectedCallback
+    // regardless of property changes, so this can run before `setConfig`
+    // has ever been called (e.g. `hass` assigned first in some editor
+    // preview / dashboard re-render orderings). Guard before touching
+    // `this.config` at all.
+    if (!this.config) {
+      return html`<ha-card class="loading"></ha-card>`
+    }
+
     const { _hide, _values, _updatingValues, config, entity } = this
     const warnings: Array<TemplateResult> = []
     if (this.stepSize < 1 && this.config.decimals === 0) {
@@ -471,9 +624,7 @@ export default class SimpleThermostat extends LitElement {
       `
     }
 
-    const {
-      attributes: { hvac_action: action },
-    } = entity
+    const action = entity.attributes?.hvac_action
 
     const renderAdapter = getAdapter(this.config.entity)
     const { min: minTemp, max: maxTemp } = renderAdapter.getRange(entity.attributes)
@@ -511,24 +662,24 @@ export default class SimpleThermostat extends LitElement {
     } else {
       sensorsHtml = this.showSensors
         ? renderSensors({
-            _hide,
-            unit,
-            hass: this._hass,
-            entity: entity,
-            sensors: this.sensors,
-            config: this.config,
-            localize: this.localize,
-            openEntityPopover: this.openEntityPopover,
-          })
+          _hide,
+          unit,
+          hass: this._hass,
+          entity: entity,
+          sensors: this.sensors,
+          config: this.config,
+          localize: this.localize,
+          openEntityPopover: this.openEntityPopover,
+        })
         : ''
     }
     return html`
       <ha-card class="${classes.join(' ')}">
         ${this.config.styles
-          ? html`<style>
+        ? html`<style>
               ${this.config.styles}
             </style>`
-          : nothing}
+        : nothing}
         ${warnings}
         ${renderHeader({
           header: this.header,
@@ -536,18 +687,20 @@ export default class SimpleThermostat extends LitElement {
           entity: entity,
           openEntityPopover: this.openEntityPopover,
         })}
+        ${renderBanners({ config: this.config, hass: this._hass, entity: entity })}
         <section class="body">
           ${sensorsHtml}
+          <div class="divider"></div>
           ${config.hide_setpoint === true ? nothing : Object.entries(_values).map(([field, value]) => {
-            const isOff = entity.state === HVAC_MODES.OFF
-            const hasValue = !isOff && ['string', 'number'].includes(typeof value)
-            const numericValue = typeof value === 'number' ? value : Number(value)
-            const showUnit = unit !== false && hasValue
-            return html`
+          const isOff = entity.state === HVAC_MODES.OFF
+          const hasValue = !isOff && ['string', 'number'].includes(typeof value)
+          const numericValue = typeof value === 'number' ? value : Number(value)
+          const showUnit = unit !== false && hasValue
+          return html`
               <div class="current-wrapper ${stepLayout}">
                 <ha-icon-button
                   ?disabled=${(value === null && minTemp === null) || (value !== null && maxTemp !== null && numericValue >= maxTemp)}
-                  class="thermostat-trigger"
+                  class="thermostat-trigger thermostat-trigger--up"
                   aria-label="Increase ${field}"
                   .label=${`Increase ${field}`}
                   @click="${() => value === null ? this.setTemperature(0, field, minTemp!) : this.setTemperature(this.stepSize, field)}"
@@ -561,31 +714,30 @@ export default class SimpleThermostat extends LitElement {
                   @pointercancel=${this._onActionPointerUp}
                   @click=${this._onActionClick}
                   @keydown=${(e: KeyboardEvent) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      this._dispatchAction('tap')
-                    }
-                  }}
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                this._dispatchAction('tap')
+              }
+            }}
                   role="button"
                   tabindex="0"
-                  aria-label=${`${field}: ${formatNumber(value, { ...config, locale: this._hass?.locale })}${
-                    showUnit ? ` ${unit}` : ''
-                  }`}
+                  aria-label=${`${field}: ${formatNumber(value, { ...config, locale: this._hass?.locale })}${showUnit ? ` ${unit}` : ''
+            }`}
                   class=${_updatingValues
-                    ? 'current--value updating'
-                    : 'current--value'}
+              ? 'current--value updating'
+              : 'current--value'}
                 >
                   ${isOff ? 'OFF' : formatNumber(value, {
-                    ...config,
-                    locale: this._hass?.locale,
-                  })}
+                ...config,
+                locale: this._hass?.locale,
+              })}
                   ${showUnit
-                    ? html`<span class="current--unit">${unit}</span>`
-                    : nothing}
+              ? html`<span class="current--unit">${unit}</span>`
+              : nothing}
                 </h3>
                 <ha-icon-button
                   ?disabled=${value === null || (minTemp !== null && numericValue <= minTemp)}
-                  class="thermostat-trigger"
+                  class="thermostat-trigger thermostat-trigger--down"
                   aria-label="Decrease ${field}"
                   .label=${`Decrease ${field}`}
                   @click="${() => this.setTemperature(-this.stepSize, field)}"
@@ -594,7 +746,7 @@ export default class SimpleThermostat extends LitElement {
                 </ha-icon-button>
               </div>
             `
-          })}
+        })}
         </section>
 
         ${this.modes.map((mode) =>
@@ -637,19 +789,32 @@ export default class SimpleThermostat extends LitElement {
       ...this._values,
       [field]: +formatNumber(newValue, { decimals }),
     }
+    this._pendingSetTemperature = true
     this._debouncedSetTemperature(this._values)
   }
 
   setMode = (type: string, mode: string) => {
     if (type && mode) {
-      const adapter = getAdapter(this.config.entity)
-      const payloadValue = adapter.transformModePayloadValue
-        ? adapter.transformModePayloadValue(type, mode)
-        : mode
-      this._callAction(adapter.getModeService(type), {
-        entity_id: this.config.entity,
-        [adapter.getModePayloadKey(type)]: payloadValue,
-      })
+      const modeConfig = (this.config.control as LooseObject)?.[type]
+      const overrideEntityId = modeConfig?.entity as string | undefined
+
+      if (overrideEntityId && this._hass?.states?.[overrideEntityId]) {
+        const domain = overrideEntityId.split('.')[0]
+        if (domain === 'select' || domain === 'input_select') {
+          this._callAction(`${domain}.select_option`, { entity_id: overrideEntityId, option: mode })
+        } else if (domain === 'switch' || domain === 'input_boolean') {
+          this._callAction(`homeassistant.turn_${mode === 'on' ? 'on' : 'off'}`, { entity_id: overrideEntityId })
+        }
+      } else {
+        const adapter = getAdapter(this.config.entity)
+        const payloadValue = adapter.transformModePayloadValue
+          ? adapter.transformModePayloadValue(type, mode)
+          : mode
+        this._callAction(adapter.getModeService(type), {
+          entity_id: this.config.entity,
+          [adapter.getModePayloadKey(type)]: payloadValue,
+        })
+      }
       fireEvent(this, 'haptic', 'light')
     } else {
       fireEvent(this, 'haptic', 'failure')

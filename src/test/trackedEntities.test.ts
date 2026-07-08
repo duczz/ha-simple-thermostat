@@ -36,11 +36,11 @@ describe('getTrackedEntities helper', () => {
   test('tracks configured entities and sensors arrays', () => {
     const config = {
       entity: 'climate.living_room',
-      entities: [
-        'sensor.outdoor_temp',
+      sensors: [
+        { entity: 'sensor.outdoor_temp' },
         { entity: 'sensor.window_state' },
       ],
-    }
+    } as any
     const tracked = getTrackedEntities(config)
     expect(tracked).toContain('climate.living_room')
     expect(tracked).toContain('sensor.outdoor_temp')
@@ -48,16 +48,57 @@ describe('getTrackedEntities helper', () => {
     expect(tracked).toHaveLength(3)
   })
 
+  test('tracks header fault entities', () => {
+    const config = {
+      entity: 'climate.living_room',
+      header: {
+        faults: [
+          { entity: 'binary_sensor.fault_1' },
+          { entity: 'binary_sensor.fault_2', icon: 'mdi:alert', hide_inactive: true },
+        ],
+      },
+    } as any
+    const tracked = getTrackedEntities(config)
+    expect(tracked).toContain('climate.living_room')
+    expect(tracked).toContain('binary_sensor.fault_1')
+    expect(tracked).toContain('binary_sensor.fault_2')
+    expect(tracked).toHaveLength(3)
+  })
+
+  test('tracks banner entities', () => {
+    const config = {
+      entity: 'climate.living_room',
+      banners: [
+        { entity: 'binary_sensor.window', state: 'on' },
+        { attribute: 'battery_level', below: 20 },
+      ],
+    } as any
+    const tracked = getTrackedEntities(config)
+    expect(tracked).toContain('binary_sensor.window')
+    expect(tracked).toHaveLength(2)
+  })
+
+  test('sensors wins over entities alias when both are present', () => {
+    const config = {
+      entity: 'climate.living_room',
+      entities: [{ entity: 'sensor.legacy' }],
+      sensors: [{ entity: 'sensor.editor_managed' }],
+    } as any
+    const tracked = getTrackedEntities(config)
+    expect(tracked).toContain('sensor.editor_managed')
+    expect(tracked).not.toContain('sensor.legacy')
+  })
+
   test('deduplicates entities in the tracking list', () => {
     const config = {
       entity: 'climate.living_room',
       current_value_entity: 'climate.living_room', // same
-      entities: [
-        'climate.living_room',
-        'sensor.outdoor_temp',
-        'sensor.outdoor_temp', // duplicate
+      sensors: [
+        { entity: 'climate.living_room' },
+        { entity: 'sensor.outdoor_temp' },
+        { entity: 'sensor.outdoor_temp' }, // duplicate
       ],
-    }
+    } as any
     const tracked = getTrackedEntities(config)
     expect(tracked).toEqual(['climate.living_room', 'sensor.outdoor_temp'])
   })

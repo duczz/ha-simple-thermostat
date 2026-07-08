@@ -1,6 +1,6 @@
-import { LitElement, html } from 'lit'
+import { LitElement, html, nothing } from 'lit'
 import { state, property } from 'lit/decorators.js'
-import { mdiBookOpenVariant } from '@mdi/js'
+import { mdiBookOpenVariant, mdiPageLayoutHeader, mdiTune, mdiPalette, mdiGestureTap, mdiDelete, mdiPlus, mdiCheck, mdiCodeBraces, mdiThermometer, mdiArrowAll, mdiChevronDown, mdiChevronUp, mdiInformationOutline } from '@mdi/js'
 
 import styles from './styles.css'
 import fireEvent from './fireEvent'
@@ -8,6 +8,9 @@ import { version } from '../package.json'
 import { CardConfig } from './config/card'
 import { HASS } from './types'
 import { getAdapter, EntityAdapter } from './adapters'
+import { isObject } from './utils'
+import { mergeBannerFormData } from './config/bannerForm'
+import { applyFormChange, shiftCollapseState } from './config/editorForm'
 
 declare const process: { env: { BUILD_TIME: string } }
 const BUILD_TIME = process.env.BUILD_TIME
@@ -20,7 +23,20 @@ const GithubReadMe =
 // fallback we used to do.
 const cloneDeep = <T>(obj: T): T => structuredClone(obj)
 
-function buildSchema(config: any) {
+export function buildSchema(config: any) {
+  // Show any custom step_size (e.g. 2) as its own dropdown option so the field
+  // isn't rendered blank for values outside the presets.
+  const stepSizeOptions = [
+    { value: 'auto', label: 'Auto (from entity)' },
+    { value: '0.1', label: '0.1' },
+    { value: '0.5', label: '0.5' },
+    { value: '1', label: '1' },
+  ]
+  const currentStep = config?.step_size != null ? String(config.step_size) : null
+  if (currentStep && !stepSizeOptions.some((o) => o.value === currentStep)) {
+    stepSizeOptions.push({ value: currentStep, label: currentStep })
+  }
+
   const headerSchema: any[] = []
   if (config.header !== false) {
     headerSchema.push(
@@ -32,26 +48,41 @@ function buildSchema(config: any) {
         ],
       },
       { name: 'toggle.entity', selector: { entity: {} } },
-      { name: 'toggle.name', selector: { text: {} } },
-      ...(config.header?.toggle?.entity
-        ? [{ name: 'toggle.icon', selector: { icon: {} } }]
-        : [])
+      {
+        type: 'grid',
+        schema: [
+          { name: 'toggle.name', selector: { text: {} } },
+          { name: 'toggle.icon', selector: { icon: {} } },
+        ],
+      }
     )
   }
 
   return [
     {
-      name: 'entity',
-      required: true,
-      selector: { entity: { domain: ['climate', 'fan', 'humidifier'] } },
-    },
-    {
-      name: 'current_value_entity',
-      selector: { entity: { domain: ['sensor', 'input_number'] } },
+      type: 'expandable',
+      title: 'General',
+      iconPath: mdiThermometer,
+      expanded: true,
+      schema: [
+        { name: 'entity', selector: { entity: { domain: ['climate', 'fan', 'humidifier'] } } },
+        { name: 'current_value_entity', selector: { entity: { domain: 'sensor' } } },
+        {
+          type: 'grid',
+          schema: [
+            {
+              name: 'decimals',
+              selector: { number: { min: 0, max: 5, step: 1, mode: 'box' } },
+            },
+            { name: 'unit', selector: { text: {} } },
+          ],
+        },
+      ],
     },
     {
       type: 'expandable',
       title: 'Header',
+      iconPath: mdiPageLayoutHeader,
       schema: [
         { name: 'show_header', selector: { boolean: {} } },
         ...headerSchema,
@@ -59,8 +90,37 @@ function buildSchema(config: any) {
     },
     {
       type: 'expandable',
-      title: 'Mode Controls',
+      title: 'Controls',
+      iconPath: mdiTune,
       schema: [
+        { name: 'hide_setpoint', selector: { boolean: {} } },
+        {
+          type: 'grid',
+          schema: [
+            {
+              name: 'layout.step',
+              selector: {
+                select: {
+                  mode: 'dropdown',
+                  options: [
+                    { value: 'row', label: 'Row' },
+                    { value: 'column', label: 'Column' },
+                    { value: 'right', label: 'Right (Stacked)' },
+                  ],
+                },
+              },
+            },
+            {
+              name: 'step_size',
+              selector: {
+                select: {
+                  mode: 'dropdown',
+                  options: stepSizeOptions,
+                },
+              },
+            },
+          ],
+        },
         {
           type: 'grid',
           column_min_width: '130px',
@@ -79,95 +139,24 @@ function buildSchema(config: any) {
             { name: 'layout.mode.headings', selector: { boolean: {} } },
           ],
         },
+        {
+          type: 'grid',
+          column_min_width: '130px',
+          schema: [
+            { name: 'show_swing_vertical', selector: { boolean: {} } },
+            { name: 'show_swing_horizontal', selector: { boolean: {} } },
+          ],
+        },
+        { name: 'control.swing_vertical.entity', selector: { entity: {} } },
+        { name: 'control.swing_horizontal.entity', selector: { entity: {} } },
       ],
     },
-    {
-      type: 'expandable',
-      title: 'Layout & Display',
-      schema: [
-        {
-          type: 'grid',
-          schema: [
-            {
-              name: 'decimals',
-              selector: { number: { min: 0, max: 5, step: 1, mode: 'box' } },
-            },
-            { name: 'unit', selector: { text: {} } },
-          ],
-        },
-        {
-          type: 'grid',
-          schema: [
-            {
-              name: 'layout.step',
-              selector: {
-                select: {
-                  mode: 'dropdown',
-                  options: [
-                    { value: 'row', label: 'Row' },
-                    { value: 'column', label: 'Column' },
-                  ],
-                },
-              },
-            },
-            {
-              name: 'step_size',
-              selector: {
-                select: {
-                  mode: 'dropdown',
-                  options: [
-                    { value: 'auto', label: 'Auto (from entity)' },
-                    { value: '0.1', label: '0.1' },
-                    { value: '0.5', label: '0.5' },
-                    { value: '1', label: '1' },
-                  ],
-                },
-              },
-            },
-          ],
-        },
-        { name: 'fallback', selector: { text: {} } },
-        { name: 'hide_setpoint', selector: { boolean: {} } },
-        {
-          type: 'grid',
-          column_min_width: '160px',
-          schema: [
-            { name: 'hide.temperature', selector: { boolean: {} } },
-            { name: 'hide.state', selector: { boolean: {} } },
-          ],
-        },
-        {
-          type: 'grid',
-          column_min_width: '160px',
-          schema: [
-            { name: 'label.temperature', selector: { text: {} } },
-            { name: 'label.state', selector: { text: {} } },
-          ],
-        },
-        {
-          type: 'grid',
-          column_min_width: '160px',
-          schema: [
-            {
-              name: 'layout.sensors.type',
-              selector: {
-                select: {
-                  mode: 'dropdown',
-                  options: [
-                    { value: 'table', label: 'Table' },
-                    { value: 'list', label: 'List' },
-                  ],
-                },
-              },
-            },
-            { name: 'layout.sensors.labels', selector: { boolean: {} } },
-          ],
-        },
-      ],
-    },
+
+
     {
       type: 'expandable',
       title: 'Interactions',
+      iconPath: mdiGestureTap,
       schema: [
         { name: 'tap_action', selector: { ui_action: { default_action: 'more-info' } } },
         { name: 'hold_action', selector: { ui_action: { default_action: 'none' } } },
@@ -186,9 +175,11 @@ const LABELS: Record<string, string> = {
   'toggle.entity': 'Toggle entity',
   'toggle.name': 'Toggle label',
   'toggle.icon': 'Toggle icon',
-  show_preset: 'Preset mode',
-  show_fan: 'Fan mode',
-  show_swing: 'Swing mode',
+  show_preset: 'Show preset',
+  show_fan: 'Show fan',
+  show_swing: 'Show swing',
+  show_swing_vertical: 'Show vert. swing',
+  show_swing_horizontal: 'Show horiz. swing',
   'layout.mode.names': 'Show mode names',
   'layout.mode.icons': 'Show mode icons',
   'layout.mode.headings': 'Show mode headings',
@@ -200,37 +191,21 @@ const LABELS: Record<string, string> = {
   hide_setpoint: 'Hide setpoint controls',
   'hide.temperature': 'Hide temperature',
   'hide.state': 'Hide state',
+  'icon.temperature': 'Temperature icon',
+  'icon.state': 'State icon',
+  'color.temperature': 'Temperature color (CSS)',
+  'color.state': 'State color (CSS)',
   'label.temperature': 'Temperature label',
   'label.state': 'State label',
   'layout.sensors.type': 'Sensor layout',
   'layout.sensors.labels': 'Show sensor labels',
   tap_action: 'Tap action',
   hold_action: 'Hold action',
-  double_tap_action: 'Double-tap action',
+  double_tap_action: 'Hold-tap action',
+  'control.swing_horizontal.entity': 'Horizontal Swing entity',
+  'control.swing_vertical.entity': 'Vertical Swing entity',
 }
 
-
-function setNested(obj: any, path: string, value: any) {
-  const parts = path.split('.')
-  let o = obj
-  while (parts.length > 1) {
-    const p = parts.shift()!
-    if (!Object.hasOwn(o, p)) o[p] = {}
-    o = o[p]
-  }
-  o[parts[0]] = value
-}
-
-function deleteNested(obj: any, path: string) {
-  const parts = path.split('.')
-  let o = obj
-  while (parts.length > 1) {
-    const p = parts.shift()!
-    if (!o[p]) return
-    o = o[p]
-  }
-  delete o[parts[0]]
-}
 
 function isModeEnabled(
   config: any,
@@ -240,20 +215,51 @@ function isModeEnabled(
   const control = config.control
   if (control === false) return false
   if (Array.isArray(control)) return control.includes(type)
-  if (typeof control === 'object') return type in control
+  if (isObject(control)) {
+    if (control[type] === false || (control[type] && typeof control[type] === 'object' && control[type]._hidden === true)) return false
+    return type in control
+  }
   return adapter.getDefaultControl().includes(type)
 }
 
 export default class SimpleThermostatEditor extends LitElement {
   @state() config!: CardConfig
+  @state() _newStateColorInputs: Record<number, { state: string; color: string; committedKey?: string }> = {}
+  @state() _newStateTextColorInputs: Record<number, { state: string; color: string; committedKey?: string }> = {}
+  @state() _collapsedSensors: Record<number, boolean> = {}
+  @state() _collapsedBanners: Record<number, boolean> = {}
   @property({ attribute: false }) hass?: HASS
+
+  get _hasBatteryBanner() {
+    return (this.config?.banners || []).some((b: any) => b.attribute === 'battery_level')
+  }
+
+  get _hasWindowBanner() {
+    return (this.config?.banners || []).some((b: any) => b.icon === 'mdi:window-open' || b.text === 'Window open')
+  }
+
+  get _hasOfflineBanner() {
+    return (this.config?.banners || []).some((b: any) => {
+      if (Array.isArray(b.state)) return b.state.includes('unavailable')
+      if (typeof b.state === 'string') return b.state.includes('unavailable')
+      return false
+    })
+  }
 
   static get styles() {
     return styles
   }
 
+  // Caches the last real header object (e.g. `{ faults: [...] }`) so a
+  // show_header off/on round trip in the editor doesn't lose editor-only-
+  // unknown fields like `faults` that have no form field to repopulate them.
+  private _lastHeaderConfig: any = undefined
+
   setConfig(config: CardConfig) {
     this.config = config || ({} as CardConfig)
+    if (this.config.header && typeof this.config.header === 'object') {
+      this._lastHeaderConfig = this.config.header
+    }
   }
 
   _openLink() {
@@ -262,24 +268,34 @@ export default class SimpleThermostatEditor extends LitElement {
 
   _buildFormData() {
     const adapter = getAdapter(this.config.entity)
+    // While the header is hidden, fall back to the cached header instead of
+    // `{}` — otherwise the (invisible, since headerSchema is empty when
+    // show_header is false) name/icon/toggle form fields silently carry an
+    // empty value forward, which then wipes them the moment the header is
+    // re-enabled (applyFormChange treats an empty field as "clear this").
     const header: any =
       this.config.header && typeof this.config.header === 'object'
         ? this.config.header
-        : {}
+        : (this._lastHeaderConfig ?? {})
     const data: any = {
       entity: this.config.entity ?? '',
       current_value_entity: this.config.current_value_entity ?? '',
       show_header: this.config.header !== false,
       decimals: this.config.decimals ?? 1,
-      unit: this.config.unit ?? '',
+      // A non-string unit (`unit: false` = hide) is shown as empty in the text
+      // field; applyFormChange preserves the underlying false on save.
+      unit: typeof this.config.unit === 'string' ? this.config.unit : '',
       'layout.step': this.config.layout?.step ?? 'row',
       step_size:
         this.config.step_size != null ? String(this.config.step_size) : 'auto',
       fallback: this.config.fallback ?? '',
       'hide.temperature': this.config.hide?.temperature === true,
       'hide.state': this.config.hide?.state === true,
+      'icon.temperature': this.config.icon?.temperature ?? '',
+      'icon.state': this.config.icon?.state ?? '',
       'label.temperature': this.config.label?.temperature ?? '',
       'label.state': this.config.label?.state ?? '',
+      sensors: this.config.sensors ?? [],
       'layout.sensors.type': this.config.layout?.sensors?.type ?? 'table',
       'layout.sensors.labels':
         this.config.layout?.sensors?.labels !== false,
@@ -290,6 +306,8 @@ export default class SimpleThermostatEditor extends LitElement {
       show_preset: isModeEnabled(this.config, 'preset', adapter),
       show_fan: isModeEnabled(this.config, 'fan', adapter),
       show_swing: isModeEnabled(this.config, 'swing', adapter),
+      show_swing_vertical: isModeEnabled(this.config, 'swing_vertical', adapter),
+      show_swing_horizontal: isModeEnabled(this.config, 'swing_horizontal', adapter),
       name: header.name ?? '',
       icon: typeof header.icon === 'string' ? header.icon : '',
       'toggle.entity': header.toggle?.entity ?? '',
@@ -300,97 +318,19 @@ export default class SimpleThermostatEditor extends LitElement {
       hold_action: this.config.hold_action ?? { action: 'none' },
       double_tap_action: this.config.double_tap_action ?? { action: 'none' },
     }
+
+    const existingControl = (typeof this.config.control === 'object' && this.config.control !== null && !Array.isArray(this.config.control) ? this.config.control : {}) as any
+    data['control.swing_horizontal.entity'] = existingControl.swing_horizontal?.entity ?? ''
+    data['control.swing_vertical.entity'] = existingControl.swing_vertical?.entity ?? ''
+
     return data
   }
 
   _applyFormChange(updated: any) {
-    const copy = cloneDeep(this.config) as any
-
-    const directPaths = [
-      'entity',
-      'current_value_entity',
-      'hide_setpoint',
-      'decimals',
-      'unit',
-      'fallback',
-      'layout.step',
-      'layout.mode.names',
-      'layout.mode.icons',
-      'layout.mode.headings',
-      'layout.sensors.type',
-      'layout.sensors.labels',
-      'hide.temperature',
-      'hide.state',
-      'label.temperature',
-      'label.state',
-      'tap_action',
-      'hold_action',
-      'double_tap_action',
-    ]
-
-    for (const path of directPaths) {
-      const newVal = updated[path]
-      if (newVal === undefined || newVal === null || newVal === '') {
-        deleteNested(copy, path)
-      } else {
-        setNested(copy, path, newVal)
-      }
+    if (this.config.header && typeof this.config.header === 'object') {
+      this._lastHeaderConfig = this.config.header
     }
-
-    if (updated.show_header === false) {
-      copy.header = false
-    } else {
-      if (copy.header === false || copy.header == null) copy.header = {}
-      const headerName = updated.name
-      const headerIcon = updated.icon
-      const toggleEntity = updated['toggle.entity']
-      const toggleLabel = updated['toggle.name']
-      const toggleIcon = updated['toggle.icon']
-
-      if (headerName) copy.header.name = headerName
-      else delete copy.header.name
-      if (headerIcon) copy.header.icon = headerIcon
-      else delete copy.header.icon
-
-      if (toggleEntity) {
-        copy.header.toggle = copy.header.toggle || {}
-        copy.header.toggle.entity = toggleEntity
-        if (toggleLabel) copy.header.toggle.name = toggleLabel
-        else delete copy.header.toggle.name
-        if (toggleIcon) copy.header.toggle.icon = toggleIcon
-        else delete copy.header.toggle.icon
-      } else {
-        delete copy.header.toggle
-      }
-    }
-
-    if (updated.step_size === 'auto' || updated.step_size === '' || updated.step_size == null) {
-      delete copy.step_size
-    } else {
-      const n = Number(updated.step_size)
-      copy.step_size = Number.isNaN(n) ? updated.step_size : n
-    }
-
-    const adapter = getAdapter(copy.entity)
-    const defaultControl = adapter.getDefaultControl()
-    const desired = ['hvac']
-    if (updated.show_preset) desired.push('preset')
-    if (updated.show_fan) desired.push('fan')
-    if (updated.show_swing) desired.push('swing')
-    const namesOff = updated['layout.mode.names'] === false
-    const iconsOff = updated['layout.mode.icons'] === false
-    if (namesOff && iconsOff) {
-      copy.control = false
-    } else if (
-      desired.length === defaultControl.length &&
-      desired.every((v, i) => v === defaultControl[i])
-    ) {
-      delete copy.control
-    } else {
-      copy.control = desired
-    }
-
-    return copy
+    return applyFormChange(this.config, updated, this._lastHeaderConfig)
   }
 
   _valueChanged = (ev: CustomEvent) => {
@@ -401,23 +341,725 @@ export default class SimpleThermostatEditor extends LitElement {
 
   _computeLabel = (schema: any) => LABELS[schema.name] ?? schema.name
 
+  _getVirtualSensors() {
+    const virtualSensors: any[] = []
+    if (this.config?.hide?.temperature !== true) {
+      virtualSensors.push({
+        _isVirtual: 'temperature',
+        entity: 'Built-in: Temperature',
+        name: this.config?.label?.temperature || '',
+        icon: this.config?.icon?.temperature || '',
+        color: this.config?.color?.temperature || '',
+      })
+    }
+    if (this.config?.hide?.state !== true) {
+      virtualSensors.push({
+        _isVirtual: 'state',
+        entity: 'Built-in: State',
+        name: this.config?.label?.state || '',
+        icon: this.config?.icon?.state || '',
+        color: this.config?.color?.state || '',
+      })
+    }
+    return virtualSensors
+  }
+
+  _getAllSensors() {
+    return [...this._getVirtualSensors(), ...(this.config?.sensors || [])]
+  }
+
+  _addSensor = () => {
+    const sensors = [...(this.config.sensors || [])]
+    sensors.push({ entity: '', name: '', icon: '', color: '' } as any)
+    this._applyAndFire({ sensors })
+  }
+
+  _onSensorFormChanged = (index: number, formData: any) => {
+    const allSensors = this._getAllSensors()
+    const target = allSensors[index]
+
+    if (target._isVirtual) {
+      const copy = { ...this.config }
+      if ('label' in formData) {
+        copy.label = { ...copy.label }
+        if (formData.label) copy.label[target._isVirtual] = formData.label
+        else delete copy.label[target._isVirtual]
+      }
+      if ('icon' in formData) {
+        copy.icon = { ...copy.icon }
+        if (formData.icon) copy.icon[target._isVirtual] = formData.icon
+        else delete copy.icon[target._isVirtual]
+      }
+      if ('color' in formData) {
+        copy.color = { ...copy.color }
+        if (formData.color) copy.color[target._isVirtual] = formData.color
+        else delete copy.color[target._isVirtual]
+      }
+      fireEvent(this, 'config-changed', { config: copy })
+    } else {
+      const virtualCount = this._getVirtualSensors().length
+      const realIndex = index - virtualCount
+      const sensors = [...(this.config.sensors || [])]
+      const { label, ...rest } = formData
+
+      if (rest.entity && rest.display_as && rest.display_as !== 'state') {
+        const [domain] = rest.entity.split('.')
+        let isValid = false
+        if (rest.display_as === 'switch' && ['switch', 'input_boolean', 'light', 'fan', 'automation', 'siren'].includes(domain)) isValid = true
+        if (rest.display_as === 'slider' && ['input_number', 'number'].includes(domain)) isValid = true
+        if (rest.display_as === 'select' && ['input_select', 'select'].includes(domain)) isValid = true
+        if (!isValid) {
+          rest.display_as = 'state'
+        }
+      }
+
+      sensors[realIndex] = { ...sensors[realIndex], ...rest, name: label || undefined }
+      this._applyAndFire({ sensors })
+    }
+  }
+
+  _restoreSensor = (type: string) => {
+    if ((this.config.hide as any)?.[type]) {
+      // Clone `hide` instead of mutating the shared config object
+      const copy = { ...this.config, hide: { ...this.config.hide, [type]: false } }
+      fireEvent(this, 'config-changed', { config: copy })
+    }
+  }
+
+  _getStateColors = (index: number): Record<string, string> => {
+    const allSensors = this._getAllSensors()
+    const sensor = allSensors[index]
+    if (sensor._isVirtual) {
+      return (this.config.state_color as any)?.[sensor._isVirtual] || {}
+    } else {
+      const virtualCount = this._getVirtualSensors().length
+      const realIndex = index - virtualCount
+      return (this.config.sensors?.[realIndex] as any)?.state_color || {}
+    }
+  }
+
+  _setStateColor = (index: number, stateKey: string, color: string) => {
+    const allSensors = this._getAllSensors()
+    const sensor = allSensors[index]
+    if (sensor._isVirtual) {
+      const copy = { ...this.config } as any
+      copy.state_color = { ...copy.state_color }
+      const current = { ...(copy.state_color[sensor._isVirtual] || {}) }
+      if (color) current[stateKey] = color
+      else delete current[stateKey]
+      copy.state_color[sensor._isVirtual] = current
+      fireEvent(this, 'config-changed', { config: copy })
+    } else {
+      const virtualCount = this._getVirtualSensors().length
+      const realIndex = index - virtualCount
+      const sensors = [...(this.config.sensors || [])] as any[]
+      const current = { ...(sensors[realIndex].state_color || {}) }
+      if (color) current[stateKey] = color
+      else delete current[stateKey]
+      sensors[realIndex] = { ...sensors[realIndex], state_color: current }
+      this._applyAndFire({ sensors })
+    }
+  }
+
+  _updatePendingStateColor = (index: number, field: 'state' | 'color', value: string) => {
+    const pending = this._newStateColorInputs[index] || { state: '', color: '' }
+    const oldCommittedKey = pending.committedKey
+    const newPending = { ...pending, [field]: value }
+
+    if (newPending.state) {
+      newPending.committedKey = newPending.state
+      this._newStateColorInputs = { ...this._newStateColorInputs, [index]: newPending }
+      this._replaceStateColor(index, oldCommittedKey, newPending.state, newPending.color)
+    } else {
+      if (oldCommittedKey) {
+        this._setStateColor(index, oldCommittedKey, '')
+      }
+      newPending.committedKey = undefined
+      this._newStateColorInputs = { ...this._newStateColorInputs, [index]: newPending }
+    }
+  }
+
+  _replaceStateColor = (index: number, oldKey: string | undefined, newKey: string, color: string) => {
+    const allSensors = this._getAllSensors()
+    const sensor = allSensors[index]
+    const stateColors = { ...this._getStateColors(index) }
+
+    if (oldKey && oldKey !== newKey) {
+      delete stateColors[oldKey]
+    }
+    stateColors[newKey] = color
+
+    if (sensor._isVirtual) {
+      const copy = { ...this.config } as any
+      copy.state_color = { ...copy.state_color, [sensor._isVirtual]: stateColors }
+      fireEvent(this, 'config-changed', { config: copy })
+    } else {
+      const virtualCount = this._getVirtualSensors().length
+      const realIndex = index - virtualCount
+      const sensors = [...(this.config.sensors || [])] as any[]
+      sensors[realIndex] = { ...sensors[realIndex], state_color: stateColors }
+      this._applyAndFire({ sensors })
+    }
+  }
+
+  _commitStateColor = (index: number) => {
+    const updated = { ...this._newStateColorInputs }
+    delete updated[index]
+    this._newStateColorInputs = updated
+  }
+
+  _getStateTextColors = (index: number): Record<string, string> => {
+    const allSensors = this._getAllSensors()
+    const sensor = allSensors[index]
+    if (sensor._isVirtual) {
+      return (this.config.state_text_color as any)?.[sensor._isVirtual] || {}
+    } else {
+      const virtualCount = this._getVirtualSensors().length
+      const realIndex = index - virtualCount
+      return (this.config.sensors?.[realIndex] as any)?.state_text_color || {}
+    }
+  }
+
+  _setStateTextColor = (index: number, stateKey: string, color: string) => {
+    const allSensors = this._getAllSensors()
+    const sensor = allSensors[index]
+    if (sensor._isVirtual) {
+      const copy = { ...this.config } as any
+      copy.state_text_color = { ...copy.state_text_color }
+      const current = { ...(copy.state_text_color[sensor._isVirtual] || {}) }
+      if (color) current[stateKey] = color
+      else delete current[stateKey]
+      copy.state_text_color[sensor._isVirtual] = current
+      fireEvent(this, 'config-changed', { config: copy })
+    } else {
+      const virtualCount = this._getVirtualSensors().length
+      const realIndex = index - virtualCount
+      const sensors = [...(this.config.sensors || [])] as any[]
+      const current = { ...(sensors[realIndex].state_text_color || {}) }
+      if (color) current[stateKey] = color
+      else delete current[stateKey]
+      sensors[realIndex] = { ...sensors[realIndex], state_text_color: current }
+      this._applyAndFire({ sensors })
+    }
+  }
+
+  _updatePendingStateTextColor = (index: number, field: 'state' | 'color', value: string) => {
+    const pending = this._newStateTextColorInputs[index] || { state: '', color: '' }
+    const oldCommittedKey = pending.committedKey
+    const newPending = { ...pending, [field]: value }
+
+    if (newPending.state) {
+      newPending.committedKey = newPending.state
+      this._newStateTextColorInputs = { ...this._newStateTextColorInputs, [index]: newPending }
+      this._replaceStateTextColor(index, oldCommittedKey, newPending.state, newPending.color)
+    } else {
+      if (oldCommittedKey) {
+        this._setStateTextColor(index, oldCommittedKey, '')
+      }
+      newPending.committedKey = undefined
+      this._newStateTextColorInputs = { ...this._newStateTextColorInputs, [index]: newPending }
+    }
+  }
+
+  _replaceStateTextColor = (index: number, oldKey: string | undefined, newKey: string, color: string) => {
+    const allSensors = this._getAllSensors()
+    const sensor = allSensors[index]
+    const stateColors = { ...this._getStateTextColors(index) }
+
+    if (oldKey && oldKey !== newKey) {
+      delete stateColors[oldKey]
+    }
+    stateColors[newKey] = color
+
+    if (sensor._isVirtual) {
+      const copy = { ...this.config } as any
+      copy.state_text_color = { ...copy.state_text_color, [sensor._isVirtual]: stateColors }
+      fireEvent(this, 'config-changed', { config: copy })
+    } else {
+      const virtualCount = this._getVirtualSensors().length
+      const realIndex = index - virtualCount
+      const sensors = [...(this.config.sensors || [])] as any[]
+      sensors[realIndex] = { ...sensors[realIndex], state_text_color: stateColors }
+      this._applyAndFire({ sensors })
+    }
+  }
+
+  _commitStateTextColor = (index: number) => {
+    const updated = { ...this._newStateTextColorInputs }
+    delete updated[index]
+    this._newStateTextColorInputs = updated
+  }
+
+  _removeSensor = (index: number) => {
+    const allSensors = this._getAllSensors()
+    const target = allSensors[index]
+
+    // Keep collapse/expand state attached to the right rows after removal
+    this._collapsedSensors = shiftCollapseState(this._collapsedSensors, index)
+
+    if (target._isVirtual) {
+      const copy = { ...this.config, hide: { ...this.config.hide, [target._isVirtual]: true } }
+      fireEvent(this, 'config-changed', { config: copy })
+    } else {
+      const virtualCount = this._getVirtualSensors().length
+      const realIndex = index - virtualCount
+      const sensors = [...(this.config.sensors || [])]
+      sensors.splice(realIndex, 1)
+      if (sensors.length === 0) {
+        const copy = { ...this.config }
+        delete copy.sensors
+        fireEvent(this, 'config-changed', { config: copy })
+      } else {
+        this._applyAndFire({ sensors })
+      }
+    }
+  }
+
+  _addBanner = () => {
+    const banners = [...(this.config.banners || [])]
+    banners.push({ type: 'info', text: 'New Banner' } as any)
+    const copy = { ...this.config, banners }
+    fireEvent(this, 'config-changed', { config: copy })
+  }
+
+  _addBatteryBanner = () => {
+    const banners = [...(this.config.banners || [])]
+    banners.push({ attribute: 'battery_level', below: 20, type: 'warning', text: 'Low battery ({{value}}%)', icon: 'mdi:battery-alert' } as any)
+    fireEvent(this, 'config-changed', { config: { ...this.config, banners } })
+  }
+
+  _addWindowBanner = () => {
+    const banners = [...(this.config.banners || [])]
+    banners.push({ entity: 'binary_sensor.window', state: 'on', type: 'info', text: 'Window open', icon: 'mdi:window-open' } as any)
+    fireEvent(this, 'config-changed', { config: { ...this.config, banners } })
+  }
+
+  _addOfflineBanner = () => {
+    const banners = [...(this.config.banners || [])]
+    banners.push({ state: ['unavailable', 'unknown'], type: 'error', text: 'Device unavailable', icon: 'mdi:alert-circle-outline' } as any)
+    fireEvent(this, 'config-changed', { config: { ...this.config, banners } })
+  }
+
+  _removeBanner = (index: number) => {
+    const banners = [...(this.config.banners || [])]
+    banners.splice(index, 1)
+    // Keep collapse/expand state attached to the right banners after removal
+    this._collapsedBanners = shiftCollapseState(this._collapsedBanners, index)
+    const copy = { ...this.config }
+    if (banners.length === 0) {
+      delete copy.banners
+    } else {
+      copy.banners = banners
+    }
+    fireEvent(this, 'config-changed', { config: copy })
+  }
+
+  _onBannerFormChanged = (index: number, formData: any) => {
+    const banners = [...(this.config.banners || [])]
+    banners[index] = mergeBannerFormData(banners[index], formData)
+    const copy = { ...this.config, banners }
+    fireEvent(this, 'config-changed', { config: copy })
+  }
+
+  _applyAndFire = (updated: any) => {
+    const copy = this._applyFormChange({ ...this._buildFormData(), ...updated })
+    fireEvent(this, 'config-changed', { config: copy })
+  }
+
   render() {
     if (!this.hass || !this.config) return html``
 
     const schema = buildSchema(this.config)
     const data = this._buildFormData()
 
+    const schemaBefore = schema.filter((s: any) => !['Interactions'].includes(s.title))
+    const schemaAfter = schema.filter((s: any) => s.title === 'Interactions')
+
     return html`
       <div class="card-config">
+        <style>
+          .card-config > ha-expansion-panel,
+          .card-config > ha-form {
+            display: block;
+          }
+          /* Standard Home Assistant ha-form spacing is 24px between elements */
+          .card-config > ha-expansion-panel,
+          .card-config > ha-form:not(:first-of-type) {
+            margin-top: 24px;
+          }
+          .chip ha-icon, .chip ha-state-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+        </style>
         <ha-form
           .hass=${this.hass}
           .data=${data}
-          .schema=${schema}
+          .schema=${schemaBefore}
           .computeLabel=${this._computeLabel}
           @value-changed=${this._valueChanged}
         ></ha-form>
 
-        <ha-expansion-panel .header=${'Custom CSS'} outlined>
+        <ha-expansion-panel outlined>
+          <div slot="header" style="display: flex; align-items: center; gap: 8px;">
+            <ha-svg-icon .path=${mdiInformationOutline}></ha-svg-icon>
+            Banners
+          </div>
+          <div class="panel-content">
+            ${(this.config.banners || []).map((banner: any, index: number) => {
+        const isCollapsed = this._collapsedBanners[index] ?? true
+        const bannerSchema = [
+          { name: 'entity', selector: { entity: {} } },
+          {
+            type: 'grid',
+            column_min_width: '140px',
+            schema: [
+              { name: 'attribute', selector: { text: {} } },
+              { name: 'text', selector: { text: {} } },
+            ]
+          },
+          {
+            type: 'grid',
+            column_min_width: '140px',
+            schema: [
+              { name: 'type', selector: { select: { mode: 'dropdown', options: ['warning', 'error', 'info', 'success'] } } },
+              { name: 'icon', selector: { icon: {} } },
+            ]
+          },
+          {
+            type: 'grid',
+            column_min_width: '140px',
+            schema: [
+              { name: 'state', selector: { text: {} } },
+              { name: 'state_not', selector: { text: {} } },
+              { name: 'below', selector: { number: { mode: 'box', step: 0.1 } } },
+              { name: 'above', selector: { number: { mode: 'box', step: 0.1 } } },
+            ]
+          }
+        ]
+
+        return html`
+                <div style="border: 1px solid var(--divider-color); padding: 0 12px${isCollapsed ? '' : ' 12px'}; border-radius: 8px; margin-bottom: 12px; position: relative;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; ${isCollapsed ? '' : 'margin-bottom: 12px;'}" @click=${() => { this._collapsedBanners = { ...this._collapsedBanners, [index]: !isCollapsed } }}>
+                    <div style="font-weight: 500;">
+                      ${banner.text || banner.entity || 'New Banner'}
+                    </div>
+                    <div style="display: flex; gap: 4px; align-items: center;">
+                      <ha-icon-button
+                        .path=${mdiDelete}
+                        style="color: var(--error-color);"
+                        @click=${(e: Event) => {
+            e.stopPropagation()
+            this._removeBanner(index)
+          }}
+                      ></ha-icon-button>
+                      <ha-icon-button
+                        .path=${isCollapsed ? mdiChevronDown : mdiChevronUp}
+                        @click=${(e: Event) => {
+            e.stopPropagation()
+            this._collapsedBanners = { ...this._collapsedBanners, [index]: !isCollapsed }
+          }}
+                      ></ha-icon-button>
+                    </div>
+                  </div>
+                  ${isCollapsed ? nothing : html`
+                    <ha-form
+                      .hass=${this.hass}
+                      .data=${{ ...banner, state: Array.isArray(banner.state) ? banner.state.join(', ') : banner.state, state_not: Array.isArray(banner.state_not) ? banner.state_not.join(', ') : banner.state_not }}
+                      .schema=${bannerSchema}
+                      .computeLabel=${(s: any) => ({ entity: 'Entity (optional)', attribute: 'Attribute (optional)', text: 'Text ({{value}} allowed)', type: 'Color Type', icon: 'Icon', state: 'State triggers (comma separated)', state_not: 'State NOT triggers', below: 'Below value', above: 'Above value' })[s.name] ?? s.name}
+                      @value-changed=${(e: any) => this._onBannerFormChanged(index, e.detail.value)}
+                    ></ha-form>
+                  `}
+                </div>
+              `
+      })}
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <ha-button @click=${this._addBanner} outlined>Add Custom Banner</ha-button>
+              ${!this._hasBatteryBanner ? html`<ha-button @click=${this._addBatteryBanner} outlined>Add Low Battery Banner</ha-button>` : nothing}
+              ${!this._hasWindowBanner ? html`<ha-button @click=${this._addWindowBanner} outlined>Add Open Window Banner</ha-button>` : nothing}
+              ${!this._hasOfflineBanner ? html`<ha-button @click=${this._addOfflineBanner} outlined>Add Climate Offline Banner</ha-button>` : nothing}
+            </div>
+          </div>
+        </ha-expansion-panel>
+
+        <ha-expansion-panel outlined>
+          <div slot="header" style="display: flex; align-items: center; gap: 8px;">
+            <ha-svg-icon .path=${mdiBookOpenVariant}></ha-svg-icon>
+            Sensors
+          </div>
+          <div class="panel-content">
+            <ha-form
+              style="margin-bottom: 8px;"
+              .hass=${this.hass}
+              .data=${data}
+              .schema=${[{
+        type: 'grid',
+        column_min_width: '160px',
+        schema: [
+          {
+            name: 'layout.sensors.type',
+            selector: {
+              select: {
+                mode: 'dropdown',
+                options: [
+                  { value: 'table', label: 'Table' },
+                  { value: 'list', label: 'List' },
+                  { value: 'chips', label: 'Chips' },
+                  { value: 'badges', label: 'Badges' },
+                ],
+              },
+            },
+          },
+          { name: 'layout.sensors.labels', selector: { boolean: {} } },
+        ],
+      }]}
+              .computeLabel=${this._computeLabel}
+              @value-changed=${this._valueChanged}
+            ></ha-form>
+
+            <div style="height: 1px; background-color: var(--divider-color); margin: 8px 0;"></div>
+
+            ${this._getAllSensors().map(
+        (sensor: any, index: number) => {
+          const [entityDomain] = (sensor.entity || '').split('.')
+          const renderOptions = [{ value: 'state', label: 'State (Text)' }]
+          if (['switch', 'input_boolean', 'light', 'fan', 'automation', 'siren'].includes(entityDomain)) {
+            renderOptions.push({ value: 'switch', label: 'Toggle Switch' })
+          } else if (['input_number', 'number'].includes(entityDomain)) {
+            renderOptions.push({ value: 'slider', label: 'Slider' })
+          } else if (['input_select', 'select'].includes(entityDomain)) {
+            renderOptions.push({ value: 'select', label: 'Select Dropdown' })
+          }
+
+          const sensorSchema = sensor._isVirtual ? [
+            { name: 'label', selector: { text: {} } },
+            {
+              type: 'grid',
+              column_min_width: '140px',
+              schema: [
+                { name: 'icon', selector: { icon: {} } },
+                { name: 'color', selector: { text: {} } },
+              ],
+            },
+          ] : [
+            { name: 'entity', selector: { entity: {} } },
+            {
+              type: 'grid',
+              column_min_width: '140px',
+              schema: [
+                { name: 'label', selector: { text: {} } },
+                {
+                  name: 'display_as',
+                  selector: {
+                    select: {
+                      options: renderOptions,
+                      mode: 'dropdown'
+                    }
+                  }
+                },
+              ]
+            },
+            {
+              type: 'grid',
+              column_min_width: '140px',
+              schema: [
+                { name: 'icon', selector: { icon: {} } },
+                { name: 'color', selector: { text: {} } },
+              ],
+            },
+          ]
+          const sensorData = {
+            entity: sensor.entity || '',
+            label: sensor.name || '',
+            icon: sensor.icon || '',
+            color: sensor.color || '',
+            display_as: sensor.display_as || 'state',
+          }
+          const friendlyName = sensorData.entity && this.hass?.states?.[sensorData.entity]
+            ? this.hass.states[sensorData.entity].attributes.friendly_name || sensorData.entity
+            : sensorData.entity || `Custom Sensor ${index - this._getVirtualSensors().length + 1}`
+
+          const isCollapsed = this._collapsedSensors[index] ?? true
+
+          return html`
+            <div style="border: 1px solid var(--divider-color); padding: 0 12px${isCollapsed ? '' : ' 12px'}; border-radius: 8px; margin-bottom: 12px; position: relative;">
+              <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; ${isCollapsed ? '' : 'margin-bottom: 12px;'}" @click=${() => { this._collapsedSensors = { ...this._collapsedSensors, [index]: !isCollapsed } }}>
+                <div style="font-weight: 500;">
+                  ${sensor._isVirtual
+              ? `Built-in: ${sensor._isVirtual === 'state' ? 'State' : 'Temperature'}`
+              : `${friendlyName}${sensorData.label ? ` (${sensorData.label})` : ''}`}
+                </div>
+                <div style="display: flex; gap: 4px; align-items: center;">
+                        <ha-icon-button
+                          .path=${mdiDelete}
+                          style="color: var(--error-color);"
+                          @click=${(e: Event) => {
+              e.stopPropagation()
+              this._removeSensor(index)
+            }}
+                        ></ha-icon-button>
+                        <ha-icon-button
+                          .path=${isCollapsed ? mdiChevronDown : mdiChevronUp}
+                          @click=${(e: Event) => {
+              e.stopPropagation()
+              this._collapsedSensors = { ...this._collapsedSensors, [index]: !isCollapsed }
+            }}
+                        ></ha-icon-button>
+                      </div>
+                    </div>
+                    ${isCollapsed ? nothing : html`
+                    <ha-form
+                      .hass=${this.hass}
+                      .data=${sensorData}
+                      .schema=${sensorSchema}
+                      .computeLabel=${(s: any) => ({ entity: 'Entity', label: 'Name / Label (optional)', icon: 'Icon (optional)', color: 'Color (CSS, optional)', display_as: 'Display As' })[s.name] ?? s.name}
+                      @value-changed=${(e: any) => this._onSensorFormChanged(index, e.detail.value)}
+                    ></ha-form>
+                    ${(() => {
+                const stateColors = this._getStateColors(index)
+                const pending = this._newStateColorInputs[index] || { state: '', color: '' }
+                const entries = Object.entries(stateColors).filter(([k]) => k !== pending.committedKey)
+                return html`
+                        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--divider-color);">
+                          <div style="font-size: 12px; color: var(--secondary-text-color); font-weight: 500; margin-bottom: 6px;">State Colors (Icon)</div>
+                          ${entries.map(([stateKey, stateColor]) => html`
+                          <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; margin-bottom: 8px;">
+                            <ha-selector
+                              style="min-width: 0; margin-bottom: -22px;"
+                              .hass=${this.hass}
+                              .selector=${{ text: {} }}
+                              .value=${stateKey}
+                              .label=${'State'}
+                              disabled
+                            ></ha-selector>
+                            <ha-selector
+                              style="min-width: 0; margin-bottom: -22px;"
+                              .hass=${this.hass}
+                              .selector=${{ text: {} }}
+                              .value=${stateColor}
+                              .label=${'Color CSS'}
+                              @value-changed=${(e: any) => this._setStateColor(index, stateKey, e.detail.value)}
+                            ></ha-selector>
+                            <ha-icon-button
+                              .path=${mdiDelete}
+                              style="color: var(--error-color);"
+                              @click=${() => this._setStateColor(index, stateKey, '')}
+                            ></ha-icon-button>
+                          </div>
+                        `)}
+                        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; margin-top: 8px;">
+                          <ha-selector
+                            style="min-width: 0; margin-bottom: -22px;"
+                            .hass=${this.hass}
+                            .selector=${{ text: {} }}
+                            .value=${pending.state}
+                            .label=${'State (e.g. heat)'}
+                            @value-changed=${(e: any) => this._updatePendingStateColor(index, 'state', e.detail.value)}
+                          ></ha-selector>
+                          <ha-selector
+                            style="min-width: 0; margin-bottom: -22px;"
+                            .hass=${this.hass}
+                            .selector=${{ text: {} }}
+                            .value=${pending.color}
+                            .label=${'Color CSS'}
+                            @value-changed=${(e: any) => this._updatePendingStateColor(index, 'color', e.detail.value)}
+                          ></ha-selector>
+                          <ha-icon-button
+                            .path=${mdiPlus}
+                            style="${pending.state ? '' : 'opacity: 0.4;'}"
+                            @click=${() => this._commitStateColor(index)}
+                          ></ha-icon-button>
+                        </div>
+                      </div>
+                      ${(() => {
+                        const stateTextColors = this._getStateTextColors(index)
+                        const pendingText = this._newStateTextColorInputs[index] || { state: '', color: '' }
+                        const entriesText = Object.entries(stateTextColors).filter(([k]) => k !== pendingText.committedKey)
+                        return html`
+                        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--divider-color);">
+                          <div style="font-size: 12px; color: var(--secondary-text-color); font-weight: 500; margin-bottom: 6px;">State Colors (Text)</div>
+                          ${entriesText.map(([stateKey, stateColor]) => html`
+                          <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; margin-bottom: 8px;">
+                            <ha-selector
+                              style="min-width: 0; margin-bottom: -22px;"
+                              .hass=${this.hass}
+                              .selector=${{ text: {} }}
+                              .value=${stateKey}
+                              .label=${'State'}
+                              disabled
+                            ></ha-selector>
+                            <ha-selector
+                              style="min-width: 0; margin-bottom: -22px;"
+                              .hass=${this.hass}
+                              .selector=${{ text: {} }}
+                              .value=${stateColor}
+                              .label=${'Text Color CSS'}
+                              @value-changed=${(e: any) => this._setStateTextColor(index, stateKey, e.detail.value)}
+                            ></ha-selector>
+                            <ha-icon-button
+                              .path=${mdiDelete}
+                              style="color: var(--error-color);"
+                              @click=${() => this._setStateTextColor(index, stateKey, '')}
+                            ></ha-icon-button>
+                          </div>
+                        `)}
+                        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; margin-top: 8px;">
+                          <ha-selector
+                            style="min-width: 0; margin-bottom: -22px;"
+                            .hass=${this.hass}
+                            .selector=${{ text: {} }}
+                            .value=${pendingText.state}
+                            .label=${'State (e.g. heat)'}
+                            @value-changed=${(e: any) => this._updatePendingStateTextColor(index, 'state', e.detail.value)}
+                          ></ha-selector>
+                          <ha-selector
+                            style="min-width: 0; margin-bottom: -22px;"
+                            .hass=${this.hass}
+                            .selector=${{ text: {} }}
+                            .value=${pendingText.color}
+                            .label=${'Text Color CSS'}
+                            @value-changed=${(e: any) => this._updatePendingStateTextColor(index, 'color', e.detail.value)}
+                          ></ha-selector>
+                          <ha-icon-button
+                            .path=${mdiPlus}
+                            style="${pendingText.state ? '' : 'opacity: 0.4;'}"
+                            @click=${() => this._commitStateTextColor(index)}
+                          ></ha-icon-button>
+                        </div>
+                      </div>
+                      `})()}
+                    `})()}
+                    `}
+                  </div>
+                `
+        }
+      )}
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              ${this.config?.hide?.temperature ? html`
+                <ha-button @click=${() => this._restoreSensor('temperature')} outlined style="flex: 1;">Add Built-in Temperature</ha-button>
+              ` : nothing}
+              ${this.config?.hide?.state ? html`
+                <ha-button @click=${() => this._restoreSensor('state')} outlined style="flex: 1;">Add Built-in State</ha-button>
+              ` : nothing}
+            </div>
+            <ha-button @click=${this._addSensor} outlined style="width: 100%; margin-top: ${this.config?.hide?.temperature || this.config?.hide?.state ? '8px' : '0'};">Add Custom Sensor</ha-button>
+          </div>
+        </ha-expansion-panel>
+        <ha-form
+          .hass=${this.hass}
+          .data=${data}
+          .schema=${schemaAfter}
+          .computeLabel=${this._computeLabel}
+          @value-changed=${this._valueChanged}
+        ></ha-form>
+
+        <ha-expansion-panel outlined>
+          <div slot="header" style="display: flex; align-items: center; gap: 8px;">
+            <ha-svg-icon .path=${mdiCodeBraces}></ha-svg-icon>
+            Custom CSS
+          </div>
           <div class="panel-content">
             <div class="styles-editor">
               <ha-code-editor

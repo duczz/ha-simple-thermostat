@@ -87,14 +87,14 @@ export const MODE_ICONS = {
   // Fan modes
   on: 'mdi:fan',
   automatic: 'mdi:fan-auto',
-  normal: 'mdi:fan',
+  normal: 'mdi:scale-balance',
   low: 'mdi:fan-speed-1',
   medium: 'mdi:fan-speed-2',
   high: 'mdi:fan-speed-3',
   turbo: 'mdi:fan-alert',
-  powerful: 'mdi:fan-plus',
-  quiet: 'mdi:fan-minus',
-  silent: 'mdi:fan-minus',
+  powerful: 'mdi:lightning-bolt',
+  quiet: 'mdi:feather',
+  silent: 'mdi:feather',
   // Fan speed numbers
   '1': 'mdi:fan-speed-1',
   '2': 'mdi:fan-speed-2',
@@ -104,18 +104,24 @@ export const MODE_ICONS = {
   // Swing modes — vertical positions
   vertical: 'mdi:arrow-up-down',
   top: 'mdi:arrow-up',
+  up: 'mdi:arrow-up',
   'top-middle': 'mdi:arrow-top-right',
+  up_center: 'mdi:chevron-up',
   middle: 'mdi:arrow-collapse-vertical',
   'middle-bottom': 'mdi:arrow-bottom-right',
+  down_center: 'mdi:chevron-down',
   bottom: 'mdi:arrow-down',
+  down: 'mdi:arrow-down',
   upper: 'mdi:arrow-up',
   lower: 'mdi:arrow-down',
   // Swing modes — horizontal positions
   horizontal: 'mdi:arrow-left-right',
   left: 'mdi:arrow-left',
   'center-left': 'mdi:arrow-top-left',
+  left_center: 'mdi:chevron-left',
   center: 'mdi:arrow-collapse-horizontal',
   'center-right': 'mdi:arrow-top-right',
+  right_center: 'mdi:chevron-right',
   right: 'mdi:arrow-right',
   // Swing modes — combined
   both: 'mdi:arrow-all',
@@ -168,10 +174,10 @@ export default function parseHeaderConfig(
   } else if (config?.name === false) {
     name = false
   } else {
-    name = entity.attributes.friendly_name
+    name = entity.attributes?.friendly_name
   }
 
-  let icon: Icon = entity.attributes.hvac_action ? STATE_ICONS : MODE_ICONS
+  let icon: Icon = entity.attributes?.hvac_action ? STATE_ICONS : MODE_ICONS
   if (typeof config?.icon !== 'undefined') {
     icon = config.icon
   }
@@ -189,10 +195,12 @@ function parseToggle(config: ToggleConfig, hass): Toggle | null {
   if (!entity) return null
 
   let label = ''
-  if (config?.name === true) {
-    label = entity.attributes.friendly_name
+  if (typeof config?.name === 'string' && config.name !== '') {
+    label = config.name
+  } else if (config?.name === false) {
+    label = ''
   } else {
-    label = (config?.name as string) ?? ''
+    label = entity.attributes?.friendly_name || config.entity
   }
 
   return { entity, label, icon: config?.icon ?? false }

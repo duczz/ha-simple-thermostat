@@ -19,7 +19,7 @@ export default function renderHeader({
     return nothing
   }
 
-  const action = entity.attributes.hvac_action || entity.state
+  const action = entity.attributes?.hvac_action || entity.state
   let icon = header.icon
   if (typeof header.icon === 'object') {
     icon = icon?.[action] ?? false

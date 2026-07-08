@@ -28,9 +28,13 @@ export default function renderModeType({
   const SPECIAL_ATTRIBUTES = ['vane_horizontal', 'vane_vertical', 'oscillating', 'direction']
   const modeAttribute = SPECIAL_ATTRIBUTES.includes(type) ? type : `${type}_mode`
 
-  const maybeRenderName = (name: string | false, value: string) => {
+  const maybeRenderName = (name: string | false | undefined, value: string) => {
     if (name === false) return null
     if (modeOptions?.names === false) return null
+
+    if (name !== undefined) {
+      return name
+    }
 
     try {
       if (type === 'hvac') {
@@ -38,10 +42,10 @@ export default function renderModeType({
       }
       return hass.formatEntityAttributeValue(entity, modeAttribute, value)
     } catch {
-      return name
+      return value
     }
   }
-  const maybeRenderIcon = (icon: string) => {
+  const maybeRenderIcon = (icon: string | undefined) => {
     if (!icon) return null
     if (modeOptions?.icons === false) return null
     return html` <ha-icon class="mode-icon" .icon=${icon}></ha-icon> `
@@ -64,13 +68,22 @@ export default function renderModeType({
     title = CLEAN_TITLES[type]
   }
   if (!title) {
+    const domain = entity.entity_id.split('.')[0]
     const str = type === 'hvac' ? 'operation' : `${type}_mode`
-    title = localize(`ui.card.climate.${str}`)
-    if (title === `ui.card.climate.${str}`) {
-      const attrKey = `state_attributes.climate.${type === 'hvac' ? 'hvac' : type}_mode`
+
+    title = localize(`ui.card.${domain}.${str}`) ?? localize(`ui.card.climate.${str}`)
+
+    // In Home Assistant, localize returns the key itself if no translation is found
+    if (title === `ui.card.${domain}.${str}` || title === `ui.card.climate.${str}`) {
+      const attrKey = `state_attributes.${domain}.${type === 'hvac' ? 'hvac' : type}_mode`
+      const fallbackAttrKey = `state_attributes.climate.${type === 'hvac' ? 'hvac' : type}_mode`
+
       title = localize(attrKey)
       if (title === attrKey) {
-        title = 'Mode'
+        title = localize(fallbackAttrKey)
+        if (title === fallbackAttrKey) {
+          title = 'Mode'
+        }
       }
     }
   }
@@ -80,7 +93,7 @@ export default function renderModeType({
     <div class="modes ${headings ? 'heading' : ''}" role="group" aria-label=${title}>
       ${headings ? html` <div class="mode-title">${title}</div> ` : ''}
       ${list.map(
-        ({ value, icon, name }) => html`
+    ({ value, icon, name }) => html`
           <div
             class="mode-item ${value === mode ? 'active ' + mode : ''}"
             role="button"
@@ -89,16 +102,16 @@ export default function renderModeType({
             aria-label=${name || value}
             @click=${() => setMode(type, value)}
             @keydown=${(e: KeyboardEvent) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                setMode(type, value)
-              }
-            }}
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          setMode(type, value)
+        }
+      }}
           >
             ${maybeRenderIcon(icon)} ${maybeRenderName(name, value)}
           </div>
         `
-      )}
+  )}
     </div>
   `
 }
