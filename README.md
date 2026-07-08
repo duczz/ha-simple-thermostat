@@ -60,7 +60,6 @@ This project is a modernised fork of [nervetattoo/simple-thermostat](https://git
 **Exclusive Features only for this Fork:**
 - **Advanced Banner System**: Custom, condition-based notification banners directly above your thermostat controls.
 - **New Sensor Layouts**: Support for modern `chips` and `badges` layouts in addition to the classic lists and tables.
-- **Right-Aligned Step Controls**: A new layout option (`layout.step: right`) to position temperature adjustment buttons neatly to the right.
 
 For a detailed list of all new features, bug fixes, and improvements, please check the [CHANGELOG.md](CHANGELOG.md).
 
