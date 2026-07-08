@@ -23,9 +23,7 @@ A beautiful, highly customizable thermostat card for Home Assistant. Seamlessly 
 </p>
 <p align="center">
   <img src="assets/control.png" width="45%" alt="All control / mode options">
-</p>
-<p align="center">
-  <img src="assets/small.png" width="55%" alt="Compact layout">
+  <img src="assets/small.png" width="45%" alt="Compact layout">
 </p>
 
 ---
