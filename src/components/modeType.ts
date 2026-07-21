@@ -90,15 +90,15 @@ export default function renderModeType({
   const headings = modeOptions?.headings ?? false
 
   return html`
-    <div class="modes ${headings ? 'heading' : ''}" role="group" aria-label=${title}>
+    <div class="modes ${headings ? 'heading' : ''}" role="radiogroup" aria-label=${title}>
       ${headings ? html` <div class="mode-title">${title}</div> ` : ''}
       ${list.map(
     ({ value, icon, name }) => html`
           <div
             class="mode-item ${value === mode ? 'active ' + mode : ''}"
-            role="button"
+            role="radio"
             tabindex="0"
-            aria-pressed=${value === mode ? 'true' : 'false'}
+            aria-checked=${value === mode ? 'true' : 'false'}
             aria-label=${name || value}
             @click=${() => setMode(type, value)}
             @keydown=${(e: KeyboardEvent) => {

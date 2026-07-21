@@ -18,6 +18,14 @@ export const fanAdapter: EntityAdapter = {
     return attributes?.percentage ?? null
   },
 
+  getCurrentValueIcon(): string {
+    return 'mdi:fan'
+  },
+
+  getSetpointUnit(): string | undefined {
+    return '%'
+  },
+
   getCurrentValueTemplate(): string {
     return '{{percentage|formatNumber}}'
   },

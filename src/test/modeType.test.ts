@@ -113,3 +113,119 @@ describe('mode label localization (regression: raw key must not shadow formatEnt
     expect(text).toBe('')
   })
 })
+
+describe('accessibility: mode buttons form a radio group', () => {
+  test('role=radiogroup with role=radio items and aria-checked on the active mode', () => {
+    const container = document.createElement('div')
+    render(
+      renderModeType({
+        state: 'heat',
+        entity: climateEntity(),
+        hass: makeHass(),
+        mode: {
+          type: 'hvac',
+          hide_when_off: false,
+          mode: 'heat',
+          name: undefined,
+          list: [
+            { value: 'heat', icon: undefined, name: undefined },
+            { value: 'off', icon: undefined, name: undefined },
+          ],
+        },
+        modeOptions: {},
+        localize: (k: string) => k,
+        setMode: () => {},
+      } as any),
+      container
+    )
+    expect(container.querySelector('[role="radiogroup"]')).not.toBeNull()
+    expect(container.querySelectorAll('[role="radio"]').length).toBe(2)
+    const checked = container.querySelector('[role="radio"][aria-checked="true"]')
+    expect(checked?.getAttribute('aria-label')).toBe('heat')
+    // the inactive mode is explicitly not checked
+    expect(container.querySelector('[role="radio"][aria-checked="false"]')?.getAttribute('aria-label')).toBe('off')
+  })
+})
+
+describe('hide_when_off (off-collapse: a control row disappears while the entity is off)', () => {
+  const opts = (hide_when_off: boolean, state: string) => ({
+    state,
+    entity: climateEntity({ state }),
+    hass: makeHass(),
+    mode: {
+      type: 'fan',
+      hide_when_off,
+      mode: 'low',
+      name: undefined,
+      list: [{ value: 'low', icon: undefined, name: undefined }],
+    },
+    modeOptions: {},
+    localize: (k: string) => k,
+    setMode: () => {},
+  })
+
+  test('with the flag set, the row is hidden when the entity is off', () => {
+    expect(renderModeType(opts(true, 'off'))).toBeNull()
+  })
+
+  test('with the flag set, the row stays visible when the entity is on', () => {
+    expect(renderModeType(opts(true, 'heat'))).not.toBeNull()
+  })
+
+  test('without the flag, the row stays visible even when off', () => {
+    expect(renderModeType(opts(false, 'off'))).not.toBeNull()
+  })
+})
+
+describe('hvac bar is always shown unless explicitly hidden (#control-whitelist)', () => {
+  test('an object control that omits hvac still shows the hvac bar', () => {
+    const el = createCard(
+      { entity: 'climate.test', control: { preset: { _hide_when_off: true } } },
+      makeHass({
+        'climate.test': climateEntity({ attributes: { preset_modes: ['eco', 'comfort'] } }),
+      })
+    )
+    const types = el.modes.map((m: any) => m.type)
+    expect(types).toContain('hvac')
+    expect(types).toContain('preset')
+  })
+
+  test('adding then removing an hvac label does not toggle the bar (control without hvac)', () => {
+    // Simulates the state after clearing a mode label: control lists other
+    // types but not hvac. The bar must remain.
+    const el = createCard(
+      { entity: 'climate.test', control: { preset: {}, fan: {} } },
+      makeHass({
+        'climate.test': climateEntity({
+          attributes: { preset_modes: ['eco'], fan_modes: ['low', 'high'] },
+        }),
+      })
+    )
+    expect(el.modes.map((m: any) => m.type)).toContain('hvac')
+  })
+
+  test('hvac is hoisted to the top even when control lists it last', () => {
+    const el = createCard(
+      {
+        entity: 'climate.test',
+        control: { preset: {}, fan: {}, hvac: { cool: { name: 'Kühlen' } } },
+      },
+      makeHass({
+        'climate.test': climateEntity({
+          attributes: { preset_modes: ['eco'], fan_modes: ['low', 'high'] },
+        }),
+      })
+    )
+    expect(el.modes.map((m: any) => m.type)[0]).toBe('hvac')
+  })
+
+  test('control.hvac: false explicitly hides the hvac bar', () => {
+    const el = createCard(
+      { entity: 'climate.test', control: { hvac: false, preset: {} } },
+      makeHass({
+        'climate.test': climateEntity({ attributes: { preset_modes: ['eco'] } }),
+      })
+    )
+    expect(el.modes.map((m: any) => m.type)).not.toContain('hvac')
+  })
+})

@@ -1,5 +1,6 @@
 import { LitElement, html, nothing, PropertyValues, TemplateResult } from 'lit'
 import { state, property } from 'lit/decorators.js'
+import { mdiMinus, mdiPlus } from '@mdi/js'
 import debounce from 'debounce-fn'
 import { name as CARD_NAME } from '../package.json'
 
@@ -47,6 +48,7 @@ const ICONS = {
   DOWN: 'hass:chevron-down',
   PLUS: 'mdi:plus',
   MINUS: 'mdi:minus',
+  THERMOMETER: 'mdi:thermometer',
 }
 
 const DEFAULT_HIDE = {
@@ -161,6 +163,15 @@ export default class SimpleThermostat extends LitElement {
   // instead of silently dropping it (see _performCleanup).
   _pendingSetTemperature = false
 
+  // Press-and-hold repeat for the setpoint +/- buttons: after an initial delay
+  // the step repeats until release. Separate from the _holdTimer above (which
+  // detects tap/hold/double-tap on the temperature display).
+  _repeatTimer: ReturnType<typeof setTimeout> | null = null
+  _repeatInterval: ReturnType<typeof setInterval> | null = null
+  _repeatFired = false
+  static REPEAT_DELAY_MS = 500
+  static REPEAT_INTERVAL_MS = 300
+
   _sendSetTemperature(values: object) {
     const { domain, service, data = {} } = this.service
     this._callAction(`${domain}.${service}`, {
@@ -256,6 +267,7 @@ export default class SimpleThermostat extends LitElement {
       clearTimeout(this._entityGraceTimer)
       this._entityGraceTimer = null
     }
+    this._endRepeat()
     // Flush instead of drop: if the user changed the setpoint and navigated
     // away before the 500ms debounce fired, send it now rather than losing
     // the change silently.
@@ -430,8 +442,22 @@ export default class SimpleThermostat extends LitElement {
     } else if (Array.isArray(this.config.control)) {
       controlModes = buildBasicModes(this.config.control)
     } else if (typeof this.config.control === 'object') {
-      const entries = Object.entries(this.config.control)
-      if (entries.length > 0) {
+      const controlObj = this.config.control as Record<string, any>
+      const rawEntries = Object.entries(controlObj)
+      if (rawEntries.length > 0) {
+        // hvac (the primary heat/cool/off bar) is always rendered FIRST, unless
+        // explicitly hidden (`control.hvac: false` or `_hidden: true`). It's
+        // force-included when an object `control` omits it (mirrors the editor),
+        // and hoisted to the top even when it's listed later — otherwise editing
+        // a mode label (which appends `control.hvac`) would push the main bar to
+        // the bottom.
+        const hvacDef = 'hvac' in controlObj
+          ? controlObj.hvac
+          : (supportedModeType('hvac') ? {} : undefined)
+        const others = rawEntries.filter(([type]) => type !== 'hvac')
+        const entries = (hvacDef !== undefined
+          ? [['hvac', hvacDef], ...others]
+          : others) as [string, any][]
         controlModes = entries
           .filter(([type, definition]: [string, any]) => supportedModeType(type) && definition !== false && definition?._hidden !== true)
           .map(([type, definition]: [string, ModeControlObject]) => {
@@ -690,12 +716,26 @@ export default class SimpleThermostat extends LitElement {
         ${renderBanners({ config: this.config, hass: this._hass, entity: entity })}
         <section class="body">
           ${sensorsHtml}
-          <div class="divider"></div>
-          ${config.hide_setpoint === true ? nothing : Object.entries(_values).map(([field, value]) => {
+          ${config.hide_setpoint === true
+          ? nothing
+          : html`<div class="setpoint">
+          ${this._useDial(_values)
+          ? Object.keys(_values).length === 2
+            ? this._renderDualDial(_values, minTemp, maxTemp, unit, entity)
+            : Object.entries(_values).map(([field, value]) =>
+                this._renderDial(field, value, minTemp, maxTemp, unit, entity)
+              )
+          : Object.entries(_values).map(([field, value]) => {
           const isOff = entity.state === HVAC_MODES.OFF
           const hasValue = !isOff && ['string', 'number'].includes(typeof value)
           const numericValue = typeof value === 'number' ? value : Number(value)
           const showUnit = unit !== false && hasValue
+          // Split into a big integer part and a small unit/decimals column
+          // stacked to the right (like HA's ha-big-number), matching the dial.
+          const formattedValue = formatNumber(value, { ...config, locale: this._hass?.locale })
+          const numFrac = /^(-?\d+)([.,]\d+)$/.exec(formattedValue)
+          const intPart = numFrac ? numFrac[1] : formattedValue
+          const fracPart = numFrac ? numFrac[2] : ''
           return html`
               <div class="current-wrapper ${stepLayout}">
                 <ha-icon-button
@@ -703,7 +743,11 @@ export default class SimpleThermostat extends LitElement {
                   class="thermostat-trigger thermostat-trigger--up"
                   aria-label="Increase ${field}"
                   .label=${`Increase ${field}`}
-                  @click="${() => value === null ? this.setTemperature(0, field, minTemp!) : this.setTemperature(this.stepSize, field)}"
+                  @click=${() => this._tapStep(() => this._stepSetpoint(field, 1, minTemp, maxTemp))}
+                  @pointerdown=${() => this._beginRepeat(() => this._stepSetpoint(field, 1, minTemp, maxTemp))}
+                  @pointerup=${this._endRepeat}
+                  @pointercancel=${this._endRepeat}
+                  @pointerleave=${this._endRepeat}
                 >
                   <ha-icon .icon=${row ? ICONS.PLUS : ICONS.UP}></ha-icon>
                 </ha-icon-button>
@@ -721,32 +765,43 @@ export default class SimpleThermostat extends LitElement {
             }}
                   role="button"
                   tabindex="0"
-                  aria-label=${`${field}: ${formatNumber(value, { ...config, locale: this._hass?.locale })}${showUnit ? ` ${unit}` : ''
-            }`}
+                  aria-label=${isOff
+              ? `${field}: ${this._dialActionLabel(entity)}`
+              : `${field}: ${formatNumber(value, { ...config, locale: this._hass?.locale })}${showUnit ? ` ${unit}` : ''}`}
                   class=${_updatingValues
               ? 'current--value updating'
               : 'current--value'}
                 >
-                  ${isOff ? 'OFF' : formatNumber(value, {
-                ...config,
-                locale: this._hass?.locale,
-              })}
-                  ${showUnit
-              ? html`<span class="current--unit">${unit}</span>`
-              : nothing}
+                  ${isOff
+              ? this._dialActionLabel(entity)
+              : html`<span class="current--int">${intPart}</span
+                  >${showUnit || fracPart
+                  ? html`<span class="current--fu"
+                      >${showUnit
+                      ? html`<span class="current--unit">${unit}</span>`
+                      : nothing}${fracPart
+                      ? html`<span class="current--frac">${fracPart}</span>`
+                      : nothing}</span
+                    >`
+                  : nothing}`}
                 </h3>
                 <ha-icon-button
                   ?disabled=${value === null || (minTemp !== null && numericValue <= minTemp)}
                   class="thermostat-trigger thermostat-trigger--down"
                   aria-label="Decrease ${field}"
                   .label=${`Decrease ${field}`}
-                  @click="${() => this.setTemperature(-this.stepSize, field)}"
+                  @click=${() => this._tapStep(() => this._stepSetpoint(field, -1, minTemp, maxTemp))}
+                  @pointerdown=${() => this._beginRepeat(() => this._stepSetpoint(field, -1, minTemp, maxTemp))}
+                  @pointerup=${this._endRepeat}
+                  @pointercancel=${this._endRepeat}
+                  @pointerleave=${this._endRepeat}
                 >
                   <ha-icon .icon=${row ? ICONS.MINUS : ICONS.DOWN}></ha-icon>
                 </ha-icon-button>
               </div>
             `
         })}
+          </div>`}
         </section>
 
         ${this.modes.map((mode) =>
@@ -791,6 +846,352 @@ export default class SimpleThermostat extends LitElement {
     }
     this._pendingSetTemperature = true
     this._debouncedSetTemperature(this._values)
+  }
+
+  // Live preview while dragging the dial ring: the slider emits `value-changing`
+  // continuously during a drag (and `value-changed` only on release). Reflect the
+  // in-progress value in the center display so the user sees the target they are
+  // dialling in; the actual service call still waits for `value-changed`.
+  _onDialChanging = (field: string, value: number) => {
+    if (value == null || Number.isNaN(value)) return
+    const { decimals } = this.config
+    this._values = {
+      ...this._values,
+      [field]: +formatNumber(value, { decimals }),
+    }
+  }
+
+  // One setpoint step in `dir` (+1/-1), clamped to the entity's min/max. Returns
+  // false when it can't step further (already at a bound, or an uninitialised
+  // value that was just seeded) so the hold-repeat loop knows to stop.
+  _stepSetpoint(
+    field: string,
+    dir: 1 | -1,
+    minTemp: number | null,
+    maxTemp: number | null
+  ): boolean {
+    const raw = this._values[field]
+    if (raw === null || raw === undefined) {
+      // Uninitialised: the up button seeds it at the low bound once; down is a no-op.
+      if (dir > 0 && minTemp !== null) this.setTemperature(0, field, minTemp)
+      return false
+    }
+    const v = Number(raw)
+    if (dir > 0 && maxTemp !== null && v >= maxTemp) return false
+    if (dir < 0 && minTemp !== null && v <= minTemp) return false
+    this.setTemperature(dir * this.stepSize, field)
+    return true
+  }
+
+  // Press-and-hold on a +/- button: after REPEAT_DELAY_MS the `step` repeats
+  // every REPEAT_INTERVAL_MS until release, stopping early if `step` reports it
+  // can't advance (returns false). @pointerup/leave/cancel calls _endRepeat.
+  _beginRepeat = (step: () => boolean) => {
+    this._repeatFired = false
+    this._endRepeat()
+    this._repeatTimer = setTimeout(() => {
+      this._repeatFired = true
+      if (step() === false) {
+        this._endRepeat()
+        return
+      }
+      this._repeatInterval = setInterval(() => {
+        if (step() === false) this._endRepeat()
+      }, SimpleThermostat.REPEAT_INTERVAL_MS)
+    }, SimpleThermostat.REPEAT_DELAY_MS)
+  }
+
+  _endRepeat = () => {
+    if (this._repeatTimer) {
+      clearTimeout(this._repeatTimer)
+      this._repeatTimer = null
+    }
+    if (this._repeatInterval) {
+      clearInterval(this._repeatInterval)
+      this._repeatInterval = null
+    }
+  }
+
+  // The click that follows a pointer release (and the keyboard-activation path):
+  // skip it if a hold already stepped, otherwise do the single tap step.
+  _tapStep = (step: () => boolean) => {
+    if (this._repeatFired) {
+      this._repeatFired = false
+      return
+    }
+    step()
+  }
+
+  // Render the setpoint as the native HA circular dial only when explicitly
+  // requested and the element is actually registered (older HA cores lack it).
+  // Supports a single setpoint (one handle) and dual heat_cool (two handles);
+  // a missing element gracefully falls back to the number display.
+  _useDial(values: Record<string, unknown>): boolean {
+    const count = Object.keys(values).length
+    return (
+      this.config?.setpoint_style === 'dial' &&
+      (count === 1 || count === 2) &&
+      !!customElements.get('ha-control-circular-slider')
+    )
+  }
+
+  // Custom name for the entity's current hvac mode (control.hvac.<state>.name),
+  // so a mode renamed in the editor's Mode labels also shows in the dial center.
+  _modeNameOverride(entity: any): string | undefined {
+    const control = this.config?.control as any
+    if (!control || typeof control !== 'object' || Array.isArray(control)) return undefined
+    const modeObj = control.hvac?.[entity?.state]
+    return modeObj && typeof modeObj === 'object' && typeof modeObj.name === 'string'
+      ? modeObj.name
+      : undefined
+  }
+
+  // The dial's center action label, in priority order: an explicit
+  // `dial_action_labels` override (per hvac_action, then per state), then the
+  // custom mode name from Mode labels, then Home Assistant's own translated
+  // action / state text.
+  _dialActionLabel(entity: any): string {
+    const action = entity?.attributes?.hvac_action
+    const overrides = this.config?.dial_action_labels
+    if (action && overrides?.[action]) return overrides[action]
+    if (overrides?.[entity?.state]) return overrides[entity.state]
+    // `idle` means the mode is selected but nothing is running — showing the
+    // mode name ("Kühlen") there would be misleading, so surface the real live
+    // action instead. For every other case (actively heating/cooling, or no
+    // action at all) the custom mode name is what the user wants to see.
+    if (action === 'idle') {
+      return this._hass?.formatEntityAttributeValue?.(entity, 'hvac_action', 'idle') ?? action
+    }
+    const modeName = this._modeNameOverride(entity)
+    if (modeName) return modeName
+    return action
+      ? this._hass?.formatEntityAttributeValue?.(entity, 'hvac_action', action) ?? action
+      : this._hass?.formatEntityState?.(entity) ?? entity?.state
+  }
+
+  // Color the dial ring by the current HVAC mode, reusing the same mode color
+  // variables the mode buttons use (--heat-color, --cool-color, …). Returns a
+  // CSS color reference or '' for modes without a distinct color (off/unknown),
+  // where the ring keeps its neutral default. The center number stays neutral.
+  _ringColor(entity: any): string {
+    const modes: Record<string, string> = {
+      heat: 'heat',
+      cool: 'cool',
+      auto: 'auto',
+      heat_cool: 'heat_cool',
+      dry: 'dry',
+      fan_only: 'fan_only',
+    }
+    const key = modes[entity?.state]
+    return key ? `var(--${key}-color)` : ''
+  }
+
+  _renderDial(
+    field: string,
+    value: any,
+    minTemp: number | null,
+    maxTemp: number | null,
+    unit: string | boolean,
+    entity: any
+  ) {
+    const isOff = entity.state === HVAC_MODES.OFF
+    // When off there is no meaningful setpoint — mirror the native card and show
+    // the localized state ("Off"/"Aus") in place of the target temperature
+    // (honouring a custom mode name / dial_action_labels override).
+    const offLabel = this._dialActionLabel(entity)
+    const numericValue = typeof value === 'number' ? value : Number(value)
+    const adapter = getAdapter(this.config.entity)
+    const current = Number(adapter.getCurrentValue(entity.attributes ?? {}))
+    // Hide the current-value line when it equals the setpoint (e.g. a fan, whose
+    // "current" is just the percentage) — otherwise it duplicates the big number.
+    const hasCurrent = Number.isFinite(current) && current !== numericValue
+    const currentIcon = adapter.getCurrentValueIcon()
+    const unitStr = typeof unit === 'string' ? unit : ''
+    const showUnit = unit !== false && value != null
+    const locale = this._hass?.locale
+    const actionLabel = this._dialActionLabel(entity)
+    // Split the target into a big integer part and a small fractional part so
+    // the decimals sit under the unit (like HA's ha-big-number).
+    const formatted =
+      value == null
+        ? this.config.fallback ?? '—'
+        : formatNumber(value, { ...this.config, locale })
+    const fracMatch = /^(-?\d+)([.,]\d+)$/.exec(formatted)
+    const intPart = fracMatch ? fracMatch[1] : formatted
+    const fracPart = fracMatch ? `${fracMatch[2]}` : ''
+    const ringColor = isOff ? '' : this._ringColor(entity)
+    return html`
+      <div class="current-wrapper dial">
+        <ha-control-circular-slider
+          style=${ringColor ? `--control-circular-slider-color: ${ringColor}` : nothing}
+          .value=${isOff || value == null ? undefined : numericValue}
+          .current=${hasCurrent ? current : undefined}
+          .min=${minTemp ?? 0}
+          .max=${maxTemp ?? 100}
+          .step=${this.stepSize}
+          ?disabled=${isOff || value == null}
+          mode="full"
+          .label=${field}
+          @value-changing=${(e: any) =>
+            this._onDialChanging(field, e.detail.value)}
+          @value-changed=${(e: any) =>
+            this.setTemperature(0, field, e.detail.value)}
+        ></ha-control-circular-slider>
+
+        <div
+          class="dial-info"
+          @pointerdown=${this._onActionPointerDown}
+          @pointerup=${this._onActionPointerUp}
+          @pointercancel=${this._onActionPointerUp}
+          @click=${this._onActionClick}
+          role="button"
+          tabindex="0"
+          aria-label=${isOff
+            ? `${field}: ${offLabel}`
+            : `${field}: ${formatNumber(value, { ...this.config, locale })}${showUnit ? ` ${unitStr}` : ''}`}
+        >
+          ${isOff
+            ? nothing
+            : html`<span class="dial-action">${actionLabel}</span>`}
+          ${isOff
+            ? html`<span class="dial-target dial-off">${offLabel}</span>`
+            : html`<span class=${this._updatingValues ? 'dial-target updating' : 'dial-target'}>
+                <span class="dial-int">${intPart}</span
+                >${showUnit || fracPart
+                  ? html`<span class="dial-fu"
+                      >${showUnit
+                        ? html`<span class="current--unit">${unitStr}</span>`
+                        : nothing}${fracPart
+                        ? html`<span class="dial-frac">${fracPart}</span>`
+                        : nothing}</span
+                    >`
+                  : nothing}
+              </span>`}
+          ${hasCurrent
+            ? html`<span class="dial-current"
+                ><ha-icon .icon=${currentIcon}></ha-icon
+                >${formatNumber(current, { ...this.config, locale })}${unitStr
+                  ? ` ${unitStr}`
+                  : ''}</span
+              >`
+            : nothing}
+        </div>
+
+        <div class="dial-buttons">
+          <ha-outlined-icon-button
+            class="thermostat-trigger"
+            ?disabled=${isOff || value == null || (minTemp !== null && numericValue <= minTemp)}
+            aria-label="Decrease ${field}"
+            .label=${`Decrease ${field}`}
+            @click=${() => this._tapStep(() => this._stepSetpoint(field, -1, minTemp, maxTemp))}
+            @pointerdown=${() => this._beginRepeat(() => this._stepSetpoint(field, -1, minTemp, maxTemp))}
+            @pointerup=${this._endRepeat}
+            @pointercancel=${this._endRepeat}
+            @pointerleave=${this._endRepeat}
+          >
+            <ha-svg-icon .path=${mdiMinus}></ha-svg-icon>
+          </ha-outlined-icon-button>
+          <ha-outlined-icon-button
+            class="thermostat-trigger"
+            ?disabled=${isOff ||
+            (value === null && minTemp === null) ||
+            (value !== null && maxTemp !== null && numericValue >= maxTemp)}
+            aria-label="Increase ${field}"
+            .label=${`Increase ${field}`}
+            @click=${() => this._tapStep(() => this._stepSetpoint(field, 1, minTemp, maxTemp))}
+            @pointerdown=${() => this._beginRepeat(() => this._stepSetpoint(field, 1, minTemp, maxTemp))}
+            @pointerup=${this._endRepeat}
+            @pointercancel=${this._endRepeat}
+            @pointerleave=${this._endRepeat}
+          >
+            <ha-svg-icon .path=${mdiPlus}></ha-svg-icon>
+          </ha-outlined-icon-button>
+        </div>
+      </div>
+    `
+  }
+
+  // Dual (heat_cool) variant: one ring with two draggable handles for the low
+  // and high targets. The native slider reports each handle via its own
+  // low-/high- events; dragging live-updates the matching value and commits on
+  // release. Center shows both targets; +/- buttons are omitted to keep the two
+  // numbers legible inside the ring (the handles are the control).
+  _renderDualDial(
+    values: Record<string, any>,
+    minTemp: number | null,
+    maxTemp: number | null,
+    unit: string | boolean,
+    entity: any
+  ) {
+    const lowField = 'target_temp_low'
+    const highField = 'target_temp_high'
+    const isOff = entity.state === HVAC_MODES.OFF
+    const offLabel = this._dialActionLabel(entity)
+    const low = Number(values[lowField])
+    const high = Number(values[highField])
+    const adapter = getAdapter(this.config.entity)
+    const current = Number(adapter.getCurrentValue(entity.attributes ?? {}))
+    const hasCurrent = Number.isFinite(current)
+    const currentIcon = adapter.getCurrentValueIcon()
+    const unitStr = typeof unit === 'string' ? unit : ''
+    const showUnit = unit !== false
+    const locale = this._hass?.locale
+    const actionLabel = this._dialActionLabel(entity)
+    const fmt = (v: number) => formatNumber(v, { ...this.config, locale })
+    const target = (v: number, extra: string) => html`<span class="dial-dual-${extra}"
+      >${fmt(v)}${showUnit
+        ? html`<span class="dial-dual-unit">${unitStr}</span>`
+        : nothing}</span
+    >`
+    return html`
+      <div class="current-wrapper dial dual">
+        <ha-control-circular-slider
+          style=${isOff
+            ? nothing
+            : '--control-circular-slider-low-color: var(--heat-color); --control-circular-slider-high-color: var(--cool-color)'}
+          dual
+          .low=${isOff ? undefined : low}
+          .high=${isOff ? undefined : high}
+          .current=${hasCurrent ? current : undefined}
+          .min=${minTemp ?? 0}
+          .max=${maxTemp ?? 100}
+          .step=${this.stepSize}
+          ?disabled=${isOff}
+          mode="full"
+          @low-changing=${(e: any) => this._onDialChanging(lowField, e.detail.value)}
+          @low-changed=${(e: any) => this.setTemperature(0, lowField, e.detail.value)}
+          @high-changing=${(e: any) => this._onDialChanging(highField, e.detail.value)}
+          @high-changed=${(e: any) => this.setTemperature(0, highField, e.detail.value)}
+        ></ha-control-circular-slider>
+
+        <div
+          class="dial-info"
+          @pointerdown=${this._onActionPointerDown}
+          @pointerup=${this._onActionPointerUp}
+          @pointercancel=${this._onActionPointerUp}
+          @click=${this._onActionClick}
+          role="button"
+          tabindex="0"
+          aria-label=${isOff
+            ? offLabel
+            : `${fmt(low)} – ${fmt(high)}${showUnit ? ` ${unitStr}` : ''}`}
+        >
+          ${isOff
+            ? html`<span class="dial-target dial-off">${offLabel}</span>`
+            : html`
+                <span class="dial-action">${actionLabel}</span>
+                <span class=${this._updatingValues ? 'dial-dual-targets updating' : 'dial-dual-targets'}>
+                  ${target(low, 'low')}<span class="dial-dual-sep">–</span>${target(high, 'high')}
+                </span>`}
+          ${hasCurrent
+            ? html`<span class="dial-current"
+                ><ha-icon .icon=${currentIcon}></ha-icon
+                >${fmt(current)}${unitStr ? ` ${unitStr}` : ''}</span
+              >`
+            : nothing}
+        </div>
+      </div>
+    `
   }
 
   setMode = (type: string, mode: string) => {
@@ -908,6 +1309,12 @@ export default class SimpleThermostat extends LitElement {
   getUnit(): string | boolean {
     if (this.config.unit !== undefined) {
       return this.config.unit
+    }
+    // Fan/humidifier setpoints are a percentage; only climate follows the HA
+    // temperature system unit (°C/°F).
+    const adapterUnit = getAdapter(this.config.entity).getSetpointUnit()
+    if (adapterUnit !== undefined) {
+      return adapterUnit
     }
     return this._hass.config?.unit_system?.temperature ?? false
   }

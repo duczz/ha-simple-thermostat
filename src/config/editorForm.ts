@@ -34,6 +34,7 @@ const DIRECT_PATHS = [
   'entity',
   'current_value_entity',
   'hide_setpoint',
+  'setpoint_style',
   'decimals',
   'unit',
   'fallback',
@@ -61,6 +62,7 @@ const DIRECT_PATHS = [
 // to their absence).
 const FORM_DEFAULTS: Record<string, any> = {
   decimals: 1,
+  setpoint_style: 'number',
   'layout.step': 'row',
   'layout.mode.names': true,
   'layout.mode.icons': true,
@@ -73,7 +75,7 @@ const FORM_DEFAULTS: Record<string, any> = {
 }
 
 // Mode types the editor's show_* boolean toggles manage (grid in the
-// "Controls" section). `hvac` is force-included separately and has no
+// "Mode controls" section). `hvac` is force-included separately and has no
 // show_* toggle, so it's intentionally excluded here.
 const SHOW_TOGGLE_TYPES = ['preset', 'fan', 'swing', 'swing_vertical', 'swing_horizontal']
 
@@ -238,6 +240,41 @@ export function applyFormChange(config: any, updated: any, cachedHeader?: any): 
       }
     }
   }
+
+  const adapter = getAdapter(copy.entity)
+  const defaultTypes = new Set(adapter.getDefaultControl())
+
+  // Per-type "hide when off" toggles (control.<type>._hide_when_off). The flag
+  // only makes sense for a control row that is actually shown, so setting it
+  // must not silently enable a hidden/absent row — it's applied only when the
+  // type is shown (explicitly, or shown by the adapter default). Clearing is
+  // always honoured so the flag can be removed regardless.
+  const isShown = (t: string) => {
+    const d = desired[t]
+    if (d && typeof d === 'object') return d._hidden !== true
+    return defaultTypes.has(t)
+  }
+  // Each editor toggle maps to one or more control types. The single "swing"
+  // toggle covers all swing variants (base + vertical + horizontal) since they
+  // are one concept to the user.
+  const HIDE_WHEN_OFF_GROUPS: Record<string, string[]> = {
+    preset: ['preset'],
+    fan: ['fan'],
+    swing: ['swing', 'swing_vertical', 'swing_horizontal'],
+  }
+  for (const [toggleType, types] of Object.entries(HIDE_WHEN_OFF_GROUPS)) {
+    const key = `control.${toggleType}._hide_when_off`
+    if (!(key in updated)) continue
+    for (const t of types) {
+      if (updated[key] === true && isShown(t)) {
+        ensureObject(desired, t)
+        desired[t]._hide_when_off = true
+      } else if (desired[t] && typeof desired[t] === 'object') {
+        delete desired[t]._hide_when_off
+      }
+    }
+  }
+
   // Only keep control if it actually changes rendering vs. omitting the key
   // entirely (which falls back to `adapter.getDefaultControl()`).
   //
@@ -256,9 +293,6 @@ export function applyFormChange(config: any, updated: any, cachedHeader?: any): 
   // the adapter would otherwise show it. Any other key (custom name/icon,
   // an override `entity`, a per-mode-value override) is always a real
   // override regardless of visibility parity.
-  const adapter = getAdapter(copy.entity)
-  const defaultTypes = new Set(adapter.getDefaultControl())
-
   const hasRealOverrides = Object.entries(desired).some(([type, val]) => {
     if (typeof val !== 'object' || val === null) return false
     const keys = Object.keys(val)

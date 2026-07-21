@@ -1,6 +1,6 @@
 import { LitElement, html, nothing } from 'lit'
 import { state, property } from 'lit/decorators.js'
-import { mdiBookOpenVariant, mdiPageLayoutHeader, mdiTune, mdiPalette, mdiGestureTap, mdiDelete, mdiPlus, mdiCheck, mdiCodeBraces, mdiThermometer, mdiArrowAll, mdiChevronDown, mdiChevronUp, mdiInformationOutline } from '@mdi/js'
+import { mdiBookOpenVariant, mdiPageLayoutHeader, mdiTune, mdiPalette, mdiGestureTap, mdiDelete, mdiPlus, mdiCheck, mdiCodeBraces, mdiThermometer, mdiArrowAll, mdiChevronDown, mdiChevronUp, mdiInformationOutline, mdiTagTextOutline, mdiArrowUp, mdiArrowDown } from '@mdi/js'
 
 import styles from './styles.css'
 import fireEvent from './fireEvent'
@@ -17,6 +17,36 @@ const BUILD_TIME = process.env.BUILD_TIME
 
 const GithubReadMe =
   'https://github.com/duczz/ha-simple-thermostat/blob/master/README.md'
+
+// Mode types the "Mode labels" editor can rename/re-icon per value. Each is
+// probed against the entity via the adapter's getModeAttribute(type); only
+// types the entity actually exposes (a non-empty list) are shown.
+const MODE_LABEL_TYPES = [
+  'hvac',
+  'mode',
+  'preset',
+  'fan',
+  'swing',
+  'swing_horizontal',
+  'swing_vertical',
+  'vane_horizontal',
+  'vane_vertical',
+]
+
+const MODE_TYPE_LABELS: Record<string, string> = {
+  hvac: 'HVAC modes',
+  mode: 'Modes',
+  preset: 'Preset modes',
+  fan: 'Fan modes',
+  swing: 'Swing modes',
+  swing_horizontal: 'Horizontal swing',
+  swing_vertical: 'Vertical swing',
+  vane_horizontal: 'Horizontal vane',
+  vane_vertical: 'Vertical vane',
+}
+
+const isRecord = (x: any): boolean =>
+  typeof x === 'object' && x !== null && !Array.isArray(x)
 
 // structuredClone is a browser-native deep clone (Baseline 2022); all HA-
 // supported browsers ship it. JSON.parse(JSON.stringify(...)) is the older
@@ -90,10 +120,22 @@ export function buildSchema(config: any) {
     },
     {
       type: 'expandable',
-      title: 'Controls',
-      iconPath: mdiTune,
+      title: 'Setpoint',
+      iconPath: mdiThermometer,
       schema: [
         { name: 'hide_setpoint', selector: { boolean: {} } },
+        {
+          name: 'setpoint_style',
+          selector: {
+            select: {
+              mode: 'dropdown',
+              options: [
+                { value: 'number', label: 'Number (+/- buttons)' },
+                { value: 'dial', label: 'Dial (circular slider)' },
+              ],
+            },
+          },
+        },
         {
           type: 'grid',
           schema: [
@@ -121,6 +163,13 @@ export function buildSchema(config: any) {
             },
           ],
         },
+      ],
+    },
+    {
+      type: 'expandable',
+      title: 'Mode controls',
+      iconPath: mdiTune,
+      schema: [
         {
           type: 'grid',
           column_min_width: '130px',
@@ -134,9 +183,9 @@ export function buildSchema(config: any) {
           type: 'grid',
           column_min_width: '130px',
           schema: [
-            { name: 'layout.mode.names', selector: { boolean: {} } },
-            { name: 'layout.mode.icons', selector: { boolean: {} } },
-            { name: 'layout.mode.headings', selector: { boolean: {} } },
+            { name: 'control.preset._hide_when_off', selector: { boolean: {} } },
+            { name: 'control.fan._hide_when_off', selector: { boolean: {} } },
+            { name: 'control.swing._hide_when_off', selector: { boolean: {} } },
           ],
         },
         {
@@ -147,8 +196,17 @@ export function buildSchema(config: any) {
             { name: 'show_swing_horizontal', selector: { boolean: {} } },
           ],
         },
-        { name: 'control.swing_vertical.entity', selector: { entity: {} } },
-        { name: 'control.swing_horizontal.entity', selector: { entity: {} } },
+        { name: 'control.swing_vertical.entity', selector: { entity: { domain: ['select', 'input_select', 'switch', 'input_boolean'] } } },
+        { name: 'control.swing_horizontal.entity', selector: { entity: { domain: ['select', 'input_select', 'switch', 'input_boolean'] } } },
+        {
+          type: 'grid',
+          column_min_width: '130px',
+          schema: [
+            { name: 'layout.mode.names', selector: { boolean: {} } },
+            { name: 'layout.mode.icons', selector: { boolean: {} } },
+            { name: 'layout.mode.headings', selector: { boolean: {} } },
+          ],
+        },
       ],
     },
 
@@ -178,17 +236,21 @@ const LABELS: Record<string, string> = {
   show_preset: 'Show preset',
   show_fan: 'Show fan',
   show_swing: 'Show swing',
-  show_swing_vertical: 'Show vert. swing',
-  show_swing_horizontal: 'Show horiz. swing',
+  'control.preset._hide_when_off': 'Hide preset when off',
+  'control.fan._hide_when_off': 'Hide fan when off',
+  'control.swing._hide_when_off': 'Hide swing when off',
+  show_swing_vertical: 'Show vertical swing',
+  show_swing_horizontal: 'Show horizontal swing',
   'layout.mode.names': 'Show mode names',
   'layout.mode.icons': 'Show mode icons',
   'layout.mode.headings': 'Show mode headings',
   decimals: 'Decimals',
   unit: 'Unit',
-  'layout.step': 'Step layout',
+  'layout.step': 'Step layout (number style)',
   step_size: 'Step size',
   fallback: 'Fallback text',
   hide_setpoint: 'Hide setpoint controls',
+  setpoint_style: 'Setpoint style',
   'hide.temperature': 'Hide temperature',
   'hide.state': 'Hide state',
   'icon.temperature': 'Temperature icon',
@@ -303,9 +365,17 @@ export default class SimpleThermostatEditor extends LitElement {
       'layout.mode.icons': this.config.layout?.mode?.icons !== false,
       'layout.mode.headings': this.config.layout?.mode?.headings === true,
       hide_setpoint: this.config.hide_setpoint === true,
+      setpoint_style: this.config.setpoint_style ?? 'number',
       show_preset: isModeEnabled(this.config, 'preset', adapter),
       show_fan: isModeEnabled(this.config, 'fan', adapter),
       show_swing: isModeEnabled(this.config, 'swing', adapter),
+      'control.preset._hide_when_off': (this.config.control as any)?.preset?._hide_when_off === true,
+      'control.fan._hide_when_off': (this.config.control as any)?.fan?._hide_when_off === true,
+      // The single swing toggle reflects any swing variant carrying the flag.
+      'control.swing._hide_when_off':
+        (this.config.control as any)?.swing?._hide_when_off === true ||
+        (this.config.control as any)?.swing_vertical?._hide_when_off === true ||
+        (this.config.control as any)?.swing_horizontal?._hide_when_off === true,
       show_swing_vertical: isModeEnabled(this.config, 'swing_vertical', adapter),
       show_swing_horizontal: isModeEnabled(this.config, 'swing_horizontal', adapter),
       name: header.name ?? '',
@@ -615,30 +685,58 @@ export default class SimpleThermostatEditor extends LitElement {
     }
   }
 
-  _addBanner = () => {
-    const banners = [...(this.config.banners || [])]
-    banners.push({ type: 'info', text: 'New Banner' } as any)
-    const copy = { ...this.config, banners }
-    fireEvent(this, 'config-changed', { config: copy })
+  // Reorder a custom sensor by one position. Built-in (virtual) sensors keep
+  // their fixed spot at the top; only entries in `config.sensors` move.
+  _moveSensor = (index: number, dir: -1 | 1) => {
+    const allSensors = this._getAllSensors()
+    if (allSensors[index]?._isVirtual) return
+    const virtualCount = this._getVirtualSensors().length
+    const realIndex = index - virtualCount
+    const targetReal = realIndex + dir
+    const sensors = [...(this.config.sensors || [])]
+    if (targetReal < 0 || targetReal >= sensors.length) return
+    ;[sensors[realIndex], sensors[targetReal]] = [sensors[targetReal], sensors[realIndex]]
+    // Keep collapse/expand state attached to the rows as they swap.
+    const c = { ...this._collapsedSensors }
+    const tmp = c[index]
+    c[index] = c[index + dir]
+    c[index + dir] = tmp
+    this._collapsedSensors = c
+    this._applyAndFire({ sensors })
   }
 
-  _addBatteryBanner = () => {
+  // Insert a new banner at the position that keeps the list sorted by severity
+  // (error → warning → info → success). Rendering still follows the array order,
+  // so a new banner arrives "pre-sorted" but can be moved manually afterwards.
+  _addBannerSorted = (banner: any) => {
+    const rankOf = (t?: string) => ({ error: 1, warning: 2, info: 3, success: 4 } as Record<string, number>)[t || 'warning'] ?? 99
     const banners = [...(this.config.banners || [])]
-    banners.push({ attribute: 'battery_level', below: 20, type: 'warning', text: 'Low battery ({{value}}%)', icon: 'mdi:battery-alert' } as any)
+    const r = rankOf(banner.type)
+    let at = banners.length
+    for (let i = 0; i < banners.length; i++) {
+      if (rankOf(banners[i].type) > r) { at = i; break }
+    }
+    banners.splice(at, 0, banner)
+    // Shift collapse state up for the banners that moved down by the insertion.
+    const shifted: Record<number, boolean> = {}
+    for (const [k, v] of Object.entries(this._collapsedBanners)) {
+      const idx = Number(k)
+      shifted[idx >= at ? idx + 1 : idx] = v
+    }
+    this._collapsedBanners = shifted
     fireEvent(this, 'config-changed', { config: { ...this.config, banners } })
   }
 
-  _addWindowBanner = () => {
-    const banners = [...(this.config.banners || [])]
-    banners.push({ entity: 'binary_sensor.window', state: 'on', type: 'info', text: 'Window open', icon: 'mdi:window-open' } as any)
-    fireEvent(this, 'config-changed', { config: { ...this.config, banners } })
-  }
+  _addBanner = () => this._addBannerSorted({ type: 'info', text: 'New Banner' })
 
-  _addOfflineBanner = () => {
-    const banners = [...(this.config.banners || [])]
-    banners.push({ state: ['unavailable', 'unknown'], type: 'error', text: 'Device unavailable', icon: 'mdi:alert-circle-outline' } as any)
-    fireEvent(this, 'config-changed', { config: { ...this.config, banners } })
-  }
+  _addBatteryBanner = () =>
+    this._addBannerSorted({ attribute: 'battery_level', below: 20, type: 'warning', text: 'Low battery ({{value}}%)', icon: 'mdi:battery-alert' })
+
+  _addWindowBanner = () =>
+    this._addBannerSorted({ entity: 'binary_sensor.window', state: 'on', type: 'info', text: 'Window open', icon: 'mdi:window-open' })
+
+  _addOfflineBanner = () =>
+    this._addBannerSorted({ state: ['unavailable', 'unknown'], type: 'error', text: 'Device unavailable', icon: 'mdi:alert-circle-outline' })
 
   _removeBanner = (index: number) => {
     const banners = [...(this.config.banners || [])]
@@ -654,6 +752,19 @@ export default class SimpleThermostatEditor extends LitElement {
     fireEvent(this, 'config-changed', { config: copy })
   }
 
+  _moveBanner = (index: number, dir: -1 | 1) => {
+    const banners = [...(this.config.banners || [])]
+    const target = index + dir
+    if (target < 0 || target >= banners.length) return
+    ;[banners[index], banners[target]] = [banners[target], banners[index]]
+    const c = { ...this._collapsedBanners }
+    const tmp = c[index]
+    c[index] = c[target]
+    c[target] = tmp
+    this._collapsedBanners = c
+    fireEvent(this, 'config-changed', { config: { ...this.config, banners } })
+  }
+
   _onBannerFormChanged = (index: number, formData: any) => {
     const banners = [...(this.config.banners || [])]
     banners[index] = mergeBannerFormData(banners[index], formData)
@@ -666,6 +777,56 @@ export default class SimpleThermostatEditor extends LitElement {
     fireEvent(this, 'config-changed', { config: copy })
   }
 
+  // Mode types the entity exposes, each with its list of raw mode values, for
+  // the "Mode labels" panel. Empty when the entity/state isn't available.
+  _getModeLabelGroups(): { type: string; label: string; values: string[] }[] {
+    const entityId = this.config?.entity
+    const stateObj = entityId ? this.hass?.states?.[entityId] : undefined
+    if (!stateObj) return []
+    const adapter = getAdapter(entityId)
+    const groups: { type: string; label: string; values: string[] }[] = []
+    for (const type of MODE_LABEL_TYPES) {
+      const attr = adapter.getModeAttribute(type)
+      const raw = stateObj.attributes?.[attr]
+      if (!Array.isArray(raw)) continue
+      const values = raw.filter((v: any) => typeof v === 'string')
+      if (values.length) groups.push({ type, label: MODE_TYPE_LABELS[type] ?? type, values })
+    }
+    return groups
+  }
+
+  // Current name/icon override for a single mode value (from control.<type>.<value>).
+  _getModeOverride(type: string, value: string): { name?: string | false; icon?: string } {
+    const control = (this.config as any)?.control
+    if (!isRecord(control)) return {}
+    const typeObj = control[type]
+    if (!isRecord(typeObj)) return {}
+    const valObj = typeObj[value]
+    return isRecord(valObj) ? valObj : {}
+  }
+
+  // Write a mode value's name/icon into control.<type>.<value>, pruning empty
+  // objects so a cleared field leaves no residue. Fires config-changed once.
+  _setModeLabels = (type: string, value: string, next: { name?: string; icon?: string }) => {
+    const copy = cloneDeep(this.config) as any
+    let control = copy.control
+    if (!isRecord(control)) control = {}
+    copy.control = control
+    const typeObj = isRecord(control[type]) ? control[type] : {}
+    control[type] = typeObj
+    const valObj = isRecord(typeObj[value]) ? { ...typeObj[value] } : {}
+    for (const field of ['name', 'icon'] as const) {
+      const nv = next[field]
+      if (nv !== undefined && nv !== null && nv !== '') valObj[field] = nv
+      else delete valObj[field]
+    }
+    if (Object.keys(valObj).length === 0) delete typeObj[value]
+    else typeObj[value] = valObj
+    if (Object.keys(typeObj).length === 0) delete control[type]
+    if (Object.keys(control).length === 0) delete copy.control
+    fireEvent(this, 'config-changed', { config: copy })
+  }
+
   render() {
     if (!this.hass || !this.config) return html``
 
@@ -674,6 +835,18 @@ export default class SimpleThermostatEditor extends LitElement {
 
     const schemaBefore = schema.filter((s: any) => !['Interactions'].includes(s.title))
     const schemaAfter = schema.filter((s: any) => s.title === 'Interactions')
+
+    const modeLabelGroups = this._getModeLabelGroups()
+    const modeLabelSchema = [
+      {
+        type: 'grid',
+        column_min_width: '140px',
+        schema: [
+          { name: 'name', selector: { text: {} } },
+          { name: 'icon', selector: { icon: {} } },
+        ],
+      },
+    ]
 
     return html`
       <div class="card-config">
@@ -700,6 +873,48 @@ export default class SimpleThermostatEditor extends LitElement {
           .computeLabel=${this._computeLabel}
           @value-changed=${this._valueChanged}
         ></ha-form>
+
+        ${modeLabelGroups.length
+        ? html`<ha-expansion-panel outlined>
+          <div slot="header" style="display: flex; align-items: center; gap: 8px;">
+            <ha-svg-icon .path=${mdiTagTextOutline}></ha-svg-icon>
+            Mode labels
+          </div>
+          <div class="panel-content">
+            <div class="mode-label-hint">
+              Rename a mode or give it a custom icon. The key on the left is the
+              raw entity state and cannot be changed. Leave a field empty to keep
+              the Home Assistant default.
+            </div>
+            ${modeLabelGroups.map(
+          (group) => html`
+              <div class="mode-label-group">
+                <div class="mode-label-heading">${group.label}</div>
+                ${group.values.map((value) => {
+            const ov = this._getModeOverride(group.type, value)
+            return html`
+                    <div class="mode-label-row">
+                      <code class="mode-label-key">${value}</code>
+                      <ha-form
+                        .hass=${this.hass}
+                        .data=${{
+                name: typeof ov.name === 'string' ? ov.name : '',
+                icon: ov.icon ?? '',
+              }}
+                        .schema=${modeLabelSchema}
+                        .computeLabel=${(s: any) => (s.name === 'name' ? 'Name' : 'Icon')}
+                        @value-changed=${(e: any) =>
+                this._setModeLabels(group.type, value, e.detail.value)}
+                      ></ha-form>
+                    </div>
+                  `
+          })}
+              </div>
+            `
+        )}
+          </div>
+        </ha-expansion-panel>`
+        : nothing}
 
         <ha-expansion-panel outlined>
           <div slot="header" style="display: flex; align-items: center; gap: 8px;">
@@ -746,6 +961,22 @@ export default class SimpleThermostatEditor extends LitElement {
                       ${banner.text || banner.entity || 'New Banner'}
                     </div>
                     <div style="display: flex; gap: 4px; align-items: center;">
+                      <ha-icon-button
+                        .path=${mdiArrowUp}
+                        .disabled=${index === 0}
+                        @click=${(e: Event) => {
+            e.stopPropagation()
+            this._moveBanner(index, -1)
+          }}
+                      ></ha-icon-button>
+                      <ha-icon-button
+                        .path=${mdiArrowDown}
+                        .disabled=${index === (Array.isArray(this.config.banners) ? this.config.banners.length : 0) - 1}
+                        @click=${(e: Event) => {
+            e.stopPropagation()
+            this._moveBanner(index, 1)
+          }}
+                      ></ha-icon-button>
                       <ha-icon-button
                         .path=${mdiDelete}
                         style="color: var(--error-color);"
@@ -892,6 +1123,23 @@ export default class SimpleThermostatEditor extends LitElement {
               : `${friendlyName}${sensorData.label ? ` (${sensorData.label})` : ''}`}
                 </div>
                 <div style="display: flex; gap: 4px; align-items: center;">
+                        ${sensor._isVirtual ? nothing : html`
+                        <ha-icon-button
+                          .path=${mdiArrowUp}
+                          .disabled=${index - this._getVirtualSensors().length === 0}
+                          @click=${(e: Event) => {
+              e.stopPropagation()
+              this._moveSensor(index, -1)
+            }}
+                        ></ha-icon-button>
+                        <ha-icon-button
+                          .path=${mdiArrowDown}
+                          .disabled=${index - this._getVirtualSensors().length === (Array.isArray(this.config.sensors) ? this.config.sensors.length : 0) - 1}
+                          @click=${(e: Event) => {
+              e.stopPropagation()
+              this._moveSensor(index, 1)
+            }}
+                        ></ha-icon-button>`}
                         <ha-icon-button
                           .path=${mdiDelete}
                           style="color: var(--error-color);"

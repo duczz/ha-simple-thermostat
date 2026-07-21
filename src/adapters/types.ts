@@ -21,6 +21,13 @@ export interface EntityAdapter {
   /** Return the current measured value (e.g. current_temperature, current_humidity, percentage). */
   getCurrentValue(attributes: LooseObject): number | string | null
 
+  /** MDI icon shown next to the current value in the dial center (thermometer / humidity / fan). */
+  getCurrentValueIcon(): string
+
+  /** Natural setpoint unit for this domain: `'%'` for fan/humidifier, or
+   * `undefined` for climate (which uses the HA temperature system unit). */
+  getSetpointUnit(): string | undefined
+
   /** The Squirrelly template snippet to render the current value (used by v3 sensors). */
   getCurrentValueTemplate(): string
 

@@ -20,6 +20,14 @@ export const humidifierAdapter: EntityAdapter = {
     return attributes?.current_humidity ?? null
   },
 
+  getCurrentValueIcon(): string {
+    return 'mdi:water-percent'
+  },
+
+  getSetpointUnit(): string | undefined {
+    return '%'
+  },
+
   getCurrentValueTemplate(): string {
     return '{{current_humidity|formatNumber}}'
   },

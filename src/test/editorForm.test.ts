@@ -33,6 +33,7 @@ const baseForm = (over: Record<string, any> = {}) => ({
   'layout.mode.icons': true,
   'layout.mode.headings': false,
   hide_setpoint: false,
+  setpoint_style: 'number',
   show_preset: false,
   show_fan: false,
   show_swing: false,
@@ -47,6 +48,22 @@ const baseForm = (over: Record<string, any> = {}) => ({
   hold_action: { action: 'none' },
   double_tap_action: { action: 'none' },
   ...over,
+})
+
+describe('per-value mode labels survive main-form edits', () => {
+  test('a control.<type>.<value>.name is kept when a show toggle changes', () => {
+    const config = { entity: 'climate.test', control: { hvac: { heat: { name: 'Heizen' } } } }
+    const result = applyFormChange(config, baseForm({ show_preset: true }))
+    expect(result.control.hvac.heat).toEqual({ name: 'Heizen' })
+    // the toggled-on preset is present too
+    expect(result.control.preset).toBeDefined()
+  })
+
+  test('a label on an otherwise-default type is not pruned away', () => {
+    const config = { entity: 'climate.test', control: { hvac: { cool: { icon: 'mdi:snowflake' } } } }
+    const result = applyFormChange(config, baseForm())
+    expect(result.control.hvac.cool).toEqual({ icon: 'mdi:snowflake' })
+  })
 })
 
 describe('applyFormChange — delete-on-default (#16)', () => {
@@ -117,6 +134,18 @@ describe('applyFormChange — delete-on-default (#16)', () => {
       baseForm()
     )
     expect(result.styles).toBe('.foo { color: red }')
+  })
+})
+
+describe('applyFormChange — setpoint_style', () => {
+  test('default (number) is omitted, dial is written', () => {
+    expect(
+      applyFormChange({ entity: 'climate.test' }, baseForm()).setpoint_style
+    ).toBeUndefined()
+    expect(
+      applyFormChange({ entity: 'climate.test' }, baseForm({ setpoint_style: 'dial' }))
+        .setpoint_style
+    ).toBe('dial')
   })
 })
 
@@ -222,6 +251,76 @@ describe('applyFormChange — control / header (regression guards)', () => {
 
     const removed = applyFormChange(withOverride, baseForm({ 'control.swing_vertical.entity': '' }))
     expect(removed.control?.swing_vertical?.entity).toBeUndefined()
+  })
+
+  test('control.<type>._hide_when_off is stored when the control is shown', () => {
+    const result = applyFormChange(
+      { entity: 'climate.test' },
+      baseForm({ show_preset: true, 'control.preset._hide_when_off': true })
+    )
+    expect(result.control.preset._hide_when_off).toBe(true)
+  })
+
+  test('the hide-when-off flag must not enable a control that is not shown', () => {
+    // preset is hidden (show_preset false) on a climate entity — toggling
+    // "hide preset when off" must not silently reveal preset.
+    const result = applyFormChange(
+      { entity: 'climate.test' },
+      baseForm({ show_preset: false, 'control.preset._hide_when_off': true })
+    )
+    expect(result.control).toBeUndefined()
+  })
+
+  test('clearing the hide-when-off flag removes it but keeps the shown control', () => {
+    const withFlag = applyFormChange(
+      { entity: 'climate.test' },
+      baseForm({ show_preset: true, 'control.preset._hide_when_off': true })
+    )
+    expect(withFlag.control.preset._hide_when_off).toBe(true)
+
+    const cleared = applyFormChange(
+      withFlag,
+      baseForm({ show_preset: true, 'control.preset._hide_when_off': false })
+    )
+    expect(cleared.control?.preset?._hide_when_off).toBeUndefined()
+    // the row itself stays shown (empty object), only the flag is gone
+    expect(cleared.control?.preset).toBeDefined()
+  })
+
+  test('the swing hide-when-off toggle covers swing and its vertical/horizontal variants', () => {
+    const result = applyFormChange(
+      { entity: 'climate.test' },
+      baseForm({
+        show_swing: true,
+        show_swing_vertical: true,
+        show_swing_horizontal: true,
+        'control.swing._hide_when_off': true,
+      })
+    )
+    expect(result.control.swing._hide_when_off).toBe(true)
+    expect(result.control.swing_vertical._hide_when_off).toBe(true)
+    expect(result.control.swing_horizontal._hide_when_off).toBe(true)
+  })
+
+  test('clearing the swing toggle removes the flag from all swing variants', () => {
+    const withFlag = applyFormChange(
+      { entity: 'climate.test' },
+      baseForm({
+        show_swing: true,
+        show_swing_vertical: true,
+        'control.swing._hide_when_off': true,
+      })
+    )
+    const cleared = applyFormChange(
+      withFlag,
+      baseForm({
+        show_swing: true,
+        show_swing_vertical: true,
+        'control.swing._hide_when_off': false,
+      })
+    )
+    expect(cleared.control?.swing?._hide_when_off).toBeUndefined()
+    expect(cleared.control?.swing_vertical?._hide_when_off).toBeUndefined()
   })
 })
 

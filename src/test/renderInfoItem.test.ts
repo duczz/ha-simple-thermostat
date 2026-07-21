@@ -101,6 +101,68 @@ test('chips layout: value cell stays non-clickable', () => {
   container.remove()
 })
 
+test('state_text_color colors the value only — the heading label stays neutral (chips)', () => {
+  const stateObj = {
+    entity_id: 'sensor.preset',
+    state: 'comfort',
+    attributes: {},
+  }
+  const result = renderInfoItem({
+    hide: false,
+    hass: { states: {}, formatEntityState: () => 'Comfort' },
+    state: stateObj,
+    layoutType: 'chips',
+    details: {
+      heading: 'Preset',
+      entity: 'sensor.preset',
+      state_text_color: { comfort: 'rgb(255, 0, 0)' },
+      rawState: 'comfort',
+    },
+  })
+
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  render(result, container)
+
+  const label = container.querySelector('.heading-text') as HTMLElement
+  const value = container.querySelector('.sensor-value') as HTMLElement
+
+  // Label must not carry the state color; value must.
+  expect(label.getAttribute('style')).toBeFalsy()
+  expect(value.getAttribute('style') || '').toContain('rgb(255, 0, 0)')
+  container.remove()
+})
+
+test('state_text_color colors the value only — the heading label stays neutral (list/table)', () => {
+  const stateObj = {
+    entity_id: 'sensor.preset',
+    state: 'comfort',
+    attributes: {},
+  }
+  const result = renderInfoItem({
+    hide: false,
+    hass: { states: {}, formatEntityState: () => 'Comfort' },
+    state: stateObj,
+    details: {
+      heading: 'Preset',
+      entity: 'sensor.preset',
+      state_text_color: { comfort: 'rgb(255, 0, 0)' },
+      rawState: 'comfort',
+    },
+  })
+
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  render(result, container)
+
+  const label = container.querySelector('.heading-text') as HTMLElement
+  const value = container.querySelector('.sensor-value') as HTMLElement
+
+  expect(label.getAttribute('style')).toBeFalsy()
+  expect(value.getAttribute('style') || '').toContain('rgb(255, 0, 0)')
+  container.remove()
+})
+
 test('render with icon', () => {
   const spec = {
     heading: 'Temperature',

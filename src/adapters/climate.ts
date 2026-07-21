@@ -27,6 +27,15 @@ export const climateAdapter: EntityAdapter = {
     return attributes?.current_temperature ?? null
   },
 
+  getCurrentValueIcon(): string {
+    return 'mdi:thermometer'
+  },
+
+  // Climate uses the HA temperature system unit (°C/°F), not a fixed unit.
+  getSetpointUnit(): string | undefined {
+    return undefined
+  },
+
   getCurrentValueTemplate(): string {
     return '{{current_temperature|formatNumber}}'
   },

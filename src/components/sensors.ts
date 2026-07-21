@@ -27,7 +27,17 @@ export default function renderSensors({
 
   const showLabels = config?.layout?.sensors?.labels ?? true
   const domain = adapter.getLocalizationDomain()
-  let stateString = hass.formatEntityState(entity)
+  // A custom mode name (control.hvac.<state>.name) is the display name for that
+  // mode, so the built-in State sensor uses it too — the live action (if any)
+  // still shows in front of it.
+  const controlCfg = config?.control
+  const hvacControl =
+    controlCfg && typeof controlCfg === 'object' && !Array.isArray(controlCfg)
+      ? (controlCfg as any).hvac
+      : undefined
+  const modeName =
+    hvacControl && typeof hvacControl === 'object' ? hvacControl[entity.state]?.name : undefined
+  let stateString = typeof modeName === 'string' ? modeName : hass.formatEntityState(entity)
   if (action) {
     const actionLabel = hass.formatEntityAttributeValue(entity, 'hvac_action', action)
     if (actionLabel && actionLabel.toLowerCase() !== stateString.toLowerCase()) {

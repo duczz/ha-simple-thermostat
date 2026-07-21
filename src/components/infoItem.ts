@@ -168,7 +168,11 @@ export default function renderInfoItem({
 
   if (hasTextHeading) {
     const appendColon = layoutType !== 'chips' && layoutType !== 'badges'
-    textResult = html` <span class="heading-text" style=${textStyleAttr || null}>${heading}${appendColon ? ':' : ''}</span> `
+    // The heading is a fixed label ("Comfort", "State") — it must stay
+    // neutral and never take the state-derived (or static) text color; only
+    // the value cell reflects color. Keeps chips/list/table consistent with
+    // the badges layout, which already renders its label without color.
+    textResult = html` <span class="heading-text">${heading}${appendColon ? ':' : ''}</span> `
   }
 
   headingResult = html`${iconResult}${textResult}`

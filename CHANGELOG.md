@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.4.1] – 2026-07-21
+
+### ✨ New Features (Fork-Exclusive)
+
+- **Circular dial setpoint (`setpoint_style: dial`)** — Show the target as Home Assistant's native circular slider: drag the ring (live update), mode-colored, with +/- buttons and the current action + temperature in the center ("Off" when off). Works for single and **dual `heat_cool`** setpoints, plus `fan` and `humidifier`. Selectable in the editor's new **Setpoint** section, tunable via `--st-dial-*`, and it falls back to the number display on older HA cores. The center text can be relabelled via `dial_action_labels`.
+- **Press-and-hold on the +/- buttons** — Holding an increase/decrease button (number or dial) repeats the step until you let go; a single tap still steps once.
+
+### ✨ Improvements
+
+- **Reorder sensors and banners** — Each custom sensor and each banner now has ▲/▼ buttons in the editor to move it up or down. Banners render in the configured order: new banners are still inserted pre-sorted by severity (error → warning → info → success), but you can now override that order manually and it is honoured.
+- **Mode labels in the visual editor** — A new **Mode labels** section lets you rename a mode or set its icon (e.g. `cool` → "Kühlen") per mode type the entity supports, without hand-writing the `control` dictionary. A renamed mode now shows consistently on the buttons, the built-in **State** sensor row, and the dial's center label — a single rename, applied everywhere.
+- **Number setpoint: stacked unit/decimals** — The `number` style now renders the value like HA's big-number component (large integer with the unit stacked above the decimals), matching the dial. When off it shows the localized (or renamed) off label instead of a hardcoded "OFF".
+- **"Hide when off" mode controls now in the visual editor** — _This is **not** a new feature._ `_hide_when_off` is a long-standing but undocumented option inherited from the original upstream `simple-thermostat` (2020). This release only surfaces it in the editor — a per-row toggle for `preset`, `fan`, and `swing` — and documents the YAML key (which works for every mode type).
+
+### 🐛 Bug Fixes
+
+- **The HVAC mode bar no longer vanishes when a `control` block omits it** — An object `control` that listed only secondary types (e.g. `preset` / `fan` / `swing`) used to drop the primary heat/cool/off bar. It is now always rendered unless explicitly hidden (`control.hvac: false` or `_hidden: true`), matching the editor.
+- **Sensor label color (chips / list / table)** — With `state_text_color` (or a static `text_color`) set, the sensor's label used to take the same color as its value. Only the value is tinted now; the label stays neutral, matching the `badges` layout.
+
 ## [2.4.0] – 2026-07-08
 
 ### ✨ New Features (Fork-Exclusive)

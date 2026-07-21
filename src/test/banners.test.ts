@@ -109,7 +109,7 @@ describe('renderBanners', () => {
     expect(texts.join(' ')).not.toContain('hidden')
   })
 
-  test('sorts banners by severity (error first)', () => {
+  test('renders banners in configured order (no automatic severity sorting)', () => {
     const config = {
       entity: 'climate.hvac',
       banners: [
@@ -121,8 +121,10 @@ describe('renderBanners', () => {
       renderBanners({ config, hass: makeHass({ 'climate.hvac': entity }), entity })
     )
     const banners = container.querySelectorAll('.st-banner')
-    expect(banners[0].classList.contains('st-banner-error')).toBe(true)
-    expect(banners[1].classList.contains('st-banner-info')).toBe(true)
+    // order follows the config array, so info stays first even though error is
+    // higher severity — the manual order (editor ▲/▼) is respected.
+    expect(banners[0].classList.contains('st-banner-info')).toBe(true)
+    expect(banners[1].classList.contains('st-banner-error')).toBe(true)
   })
 
   test('skips banners whose entity does not exist', () => {

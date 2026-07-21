@@ -61,18 +61,8 @@ export default function renderBanners({ config, hass, entity }: RenderBannersArg
 
   if (activeBanners.length === 0) return nothing
 
-  const typeRank: Record<string, number> = {
-    error: 1,
-    warning: 2,
-    info: 3,
-    success: 4,
-  }
-
-  activeBanners.sort((a, b) => {
-    const rankA = typeRank[a.type || 'warning'] ?? 99
-    const rankB = typeRank[b.type || 'warning'] ?? 99
-    return rankA - rankB
-  })
+  // Banners render in configured order (which the visual editor's ▲/▼ buttons
+  // control) — no automatic severity sorting, so a manual reorder is honoured.
 
   return html`
     <div class="st-banners">

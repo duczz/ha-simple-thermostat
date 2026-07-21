@@ -26,7 +26,11 @@ ha-card {
 }
 
 ha-card.no-header {
-  padding: 8px;
+  /* Only add a small top gap so the content isn't flush against the card edge
+     when there's no header — keep left/right/bottom identical to the header-on
+     card (0/0/8px, provided by the body) so toggling the header doesn't shift
+     the horizontal padding. */
+  padding-top: 8px;
 }
 
 ha-card.unavailable,
@@ -61,14 +65,18 @@ ha-icon-button ha-icon {
 
 .body {
   display: grid;
+  /* Query container so the dial can size against the body width (min(size,
+     40cqw)) without depending on its own grid column — avoids the circular
+     collapse a self-referencing container would cause. */
+  container-type: inline-size;
   grid-auto-flow: column;
   grid-auto-columns: minmax(min-content, auto);
   place-items: center;
-  gap: calc(var(--st-spacing, var(--st-default-spacing)) * 3);
+  gap: calc(var(--st-spacing, var(--st-default-spacing)) * 4);
   padding-top: 0;
   padding-left: calc(var(--st-spacing, var(--st-default-spacing)) * 4);
-  padding-right: calc(var(--st-spacing, var(--st-default-spacing)) * 2);
-  padding-bottom: calc(var(--st-spacing, var(--st-default-spacing)) * 2);
+  padding-right: calc(var(--st-spacing, var(--st-default-spacing)) * 4);
+  padding-bottom: 0;
 }
 
 .toggle-label {
@@ -134,7 +142,7 @@ ha-icon-button ha-icon {
   .chip {
     background: transparent;
     border-radius: 16px;
-    padding: 4px 10px;
+    padding: 4px 6px;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -183,7 +191,7 @@ ha-icon-button ha-icon {
   .st-badge {
     background: transparent;
     border-radius: 16px;
-    padding: 4px 10px;
+    padding: 4px 6px;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -320,6 +328,10 @@ header {
   align-items: center;
   justify-content: center;
   width: 100%;
+  /* Flex children default to min-width:auto and won't shrink below their
+     content — that let the number+buttons overflow the card next to a wide
+     sensor column. Allow it to shrink (content clips via overflow:hidden). */
+  min-width: 0;
   overflow: hidden;
 
   &.row {
@@ -333,7 +345,7 @@ header {
     grid-template-areas:
       "value plus"
       "value minus";
-    column-gap: 8px;
+    column-gap: 0;
     align-items: center;
     justify-content: center;
 
@@ -353,16 +365,50 @@ header {
   }
 }
 
-.divider {
-  width: 1px;
-  background-color: var(--divider-color, #e0e0e0);
-  align-self: stretch;
+/* The sensors|setpoint separator is the setpoint container's left border, so
+   it is always exactly as tall as the temperature/dial (its own content) and
+   centered against it — never stretched to the sensor column, which wraps
+   taller with chips/badges and used to push a standalone divider off-center. */
+.setpoint {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--st-spacing, var(--st-default-spacing)) * 3);
+  /* Allow the setpoint's grid column to shrink below the dial's natural size so
+     a wide sensor column can't push the dial past the card edge (the dial caps
+     itself with max-width: 100%). */
+  min-width: 0;
 }
 
-.sensors:empty+.divider,
-.divider:first-child,
-.divider:last-child {
-  display: none;
+/* The grid packs to the left, so a narrow sensor column (list/table) leaves
+   more empty space on the right of the setpoint than a wide one (chips/badges).
+   Push the setpoint to the right edge whenever sensors are present so the right
+   margin is identical across all sensor layouts. */
+.body:has(.sensors:not(:empty)) {
+  justify-content: space-between;
+}
+
+.body:has(.sensors:not(:empty)) .setpoint {
+  /* Stretch to the full body-row height (which spans the sensor column) while
+     keeping the temperature/dial vertically centered, so the divider below is a
+     percentage of the whole row — the same visible length in number and dial
+     modes, instead of a percentage of the (short) number block. */
+  align-self: stretch;
+  position: relative;
+  padding-inline-start: calc(var(--st-spacing, var(--st-default-spacing)) * 4);
+}
+
+/* A centered line: percentage height resolves against the stretched setpoint box
+   (= full body-row height), so it stays the same relative length regardless of
+   setpoint style or sensor layout. Tune length via --st-divider-height. */
+.body:has(.sensors:not(:empty)) .setpoint::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: var(--st-divider-height, 90%);
+  background-color: var(--divider-color, #e0e0e0);
 }
 
 .current--value {
@@ -370,14 +416,16 @@ header {
   align-items: center;
   margin: 0;
   font-weight: 400;
-  line-height: var(--st-font-size-l, clamp(28px, 6vw, 34px));
-  font-size: var(--st-font-size-l, clamp(28px, 6vw, 34px));
+  line-height: 1;
+  /* Capped at the configured size, but shrinks with the body width on tight
+     cards (like the dial) so the number + buttons stay inside the card instead
+     of overflowing next to a wide sensor column. */
+  font-size: min(var(--st-font-size-l, clamp(28px, 6vw, 34px)), 10cqw);
   cursor: pointer;
   transition: color 200ms ease;
 
   @media (--vp-m) {
-    font-size: var(--st-font-size-xl, clamp(34px, 5vw, 45px));
-    line-height: var(--st-font-size-xl, clamp(34px, 5vw, 45px));
+    font-size: min(var(--st-font-size-xl, clamp(34px, 5vw, 45px)), 10cqw);
   }
 
   &.updating {
@@ -392,11 +440,188 @@ header {
 }
 
 .current--unit {
-  font-size: var(--st-font-size-m, 20px);
+  font-size: min(var(--st-font-size-m, 20px), 4cqw);
+}
+
+.current--int {
+  line-height: 1;
+}
+
+/* Small column to the right of the big integer: unit on top, decimals below —
+   mirroring HA's ha-big-number (and the dial's center display). */
+.current--fu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-left: 0;
+  line-height: 1;
+}
+
+.current--frac {
+  font-size: min(var(--st-font-size-m, 20px), 4cqw);
+  opacity: 0.9;
+}
+
+/* Native-style HA circular dial (setpoint_style: dial): the ring, a centered
+   info stack (action / big target / current temperature) overlaid in the
+   middle, and the +/- buttons overlaid near the bottom — mirroring HA's own
+   ha-state-control-climate-temperature layout. Overlays sit above the ring but
+   the surrounding ring band stays draggable. */
+.current-wrapper.dial {
+  position: relative;
+  /* Effective dial size: the configured size, but never wider than 36% of the
+     body, so the ring starts shrinking around the same body width as the number
+     style (~450px) and stays in sync. Every dial part derives from this, so they
+     scale together. */
+  --_dial: min(var(--st-dial-size, 160px), 36cqw);
+  /* Size the WRAPPER to the dial and let the slider fill it — the slider
+     element sizes to its parent (like the native card) rather than reliably
+     honouring its own width/height. `max-width: 100%` + `aspect-ratio` let the
+     ring shrink (staying circular) when a wide sensor column leaves it less
+     room than --_dial, instead of spilling past the card edge. */
+  width: var(--_dial);
+  max-width: 100%;
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+
+.current-wrapper.dial ha-control-circular-slider {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.dial-info {
+  position: absolute;
+  top: var(--st-dial-info-top, 48%);
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.dial-action {
+  font-size: calc(var(--_dial) * 0.088);
+  text-transform: capitalize;
+  opacity: 0.8;
+  line-height: 1.1;
+}
+
+.dial-target {
+  display: flex;
+  align-items: center;
+  font-weight: 400;
+  line-height: 1;
+  font-size: calc(var(--_dial) * 0.26);
+  transition: color 200ms ease;
+}
+
+.dial-int {
+  line-height: 1;
+}
+
+/* "Off" replaces the number when the entity is off — a touch smaller than the
+   big setpoint so the word sits comfortably inside the ring. */
+.dial-off {
+  font-size: calc(var(--_dial) * 0.18);
+  text-transform: capitalize;
+  opacity: 0.9;
+}
+
+.dial-target.updating {
+  color: var(--error-color);
+}
+
+/* Dual (heat_cool): both targets side by side inside the ring. Smaller than the
+   single big number so "19 – 23 °C" fits, with a muted dash between them. */
+.dial-dual-targets {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: calc(var(--_dial) * 0.03);
+  font-weight: 400;
+  line-height: 1;
+  font-size: calc(var(--_dial) * 0.16);
+  transition: color 200ms ease;
+}
+
+.dial-dual-targets.updating {
+  color: var(--error-color);
+}
+
+.dial-dual-unit {
+  font-size: 0.5em;
+  margin-left: 1px;
+  opacity: 0.8;
+}
+
+.dial-dual-sep {
+  opacity: 0.4;
+}
+
+.dial-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: calc(var(--_dial) * 0.088);
+  opacity: 0.7;
+  line-height: 1.1;
+}
+
+.dial-current ha-icon {
+  --mdc-icon-size: calc(var(--_dial) * 0.1);
+}
+
+/* Small stacked column to the right of the big integer: unit on top, decimals
+   below — mirroring HA's ha-big-number. */
+.dial-fu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-left: 0;
+  font-size: 0.4em;
+  line-height: 1;
+}
+
+.dial-fu .current--unit {
+  font-size: inherit;
+}
+
+.dial-frac {
+  opacity: 0.9;
+}
+
+.dial-buttons {
+  position: absolute;
+  bottom: var(--st-dial-button-bottom, 0%);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--st-dial-button-gap, calc(var(--_dial) * 0.0625));
+}
+
+/* +/- use HA's native ha-outlined-icon-button (Material 3), which draws its own
+   outline and centers the glyph — we only size and color it. Defaults scale
+   with the dial; an explicit --st-dial-button-* var still wins. */
+.dial-buttons ha-outlined-icon-button {
+  width: var(--st-dial-button-size, calc(var(--_dial) * 0.225));
+  height: var(--st-dial-button-size, calc(var(--_dial) * 0.225));
+  color: var(--primary-text-color);
 }
 
 .thermostat-trigger {
   padding: 0;
+  /* Native 48px on normal cards, but shrink with the body width on tight cards
+     so the number +/- buttons scale down together with the value. Both the
+     button box AND the glyph scale, otherwise the fixed 24px icon keeps the
+     button looking full-size. (The dial's ha-outlined-icon-button is unaffected.) */
+  --ha-icon-button-size: min(48px, 11cqw);
+  --mdc-icon-button-size: min(48px, 11cqw);
+  --mdc-icon-size: min(24px, 5.5cqw);
 }
 
 .clickable {
@@ -522,6 +747,48 @@ header {
   padding: 4px 8px 12px;
 }
 
+.mode-label-hint {
+  font-size: 12px;
+  color: var(--secondary-text-color);
+  margin-bottom: 8px;
+}
+
+.mode-label-group {
+  margin-bottom: 8px;
+}
+
+.mode-label-heading {
+  font-weight: 500;
+  font-size: 13px;
+  margin: 8px 0 6px;
+}
+
+.mode-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mode-label-key {
+  flex: 0 0 auto;
+  min-width: 72px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--code-font-family, monospace);
+  font-size: 12px;
+  text-align: center;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: var(--secondary-background-color, rgba(120, 120, 120, 0.1));
+}
+
+.mode-label-row ha-form {
+  flex: 1;
+  min-width: 0;
+}
+
 .editor-footer {
   display: flex;
   align-items: center;
@@ -564,7 +831,7 @@ header {
   display: flex;
   flex-direction: column;
   gap: var(--st-spacing, 8px);
-  padding: var(--st-spacing, 8px) 16px 16px 16px;
+  padding: var(--st-spacing, 8px) 16px 8px 16px;
 }
 
 .st-banner {
@@ -637,7 +904,9 @@ header {
   height: 36px;
   padding: 0 6px;
   width: 100%;
-  min-width: 120px;
+  /* No hard min-width: on a tight card (wide sensor column + setpoint) the
+     select may shrink/truncate instead of forcing the whole body to overflow. */
+  min-width: 0;
   font-family: inherit;
   font-size: var(--st-font-size-sensors, 14px);
   outline: none;

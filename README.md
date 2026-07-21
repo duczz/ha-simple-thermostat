@@ -19,11 +19,11 @@ A beautiful, highly customizable thermostat card for Home Assistant. Seamlessly 
 <br>
 
 <p align="center">
-  <img src="assets/full.png" width="90%" alt="Full card with banners and sensors">
+  <img src="assets/Full_dial.png" width="90%" alt="Full card with banners and sensors">
+  <img src="assets/Full_number.png" width="90%" alt="Full card with banners and sensors">
 </p>
 <p align="center">
-  <img src="assets/control.png" width="45%" alt="All control / mode options">
-  <img src="assets/small.png" width="45%" alt="Compact layout">
+  <img src="assets/small.png" width="90%" alt="Compact layout">
 </p>
 
 ---
@@ -39,6 +39,7 @@ A beautiful, highly customizable thermostat card for Home Assistant. Seamlessly 
   - [Showing multiple thermostats](#showing-multiple-thermostats)
   - [All options](#all-options)
   - [Layout options](#layout-options)
+  - [Setpoint style](#setpoint-style)
 - [Header config](#header-config)
 - [Setpoints config](#setpoints-config)
 - [Control config](#control-config)
@@ -60,13 +61,15 @@ This project is a modernised fork of [nervetattoo/simple-thermostat](https://git
 **Exclusive Features only for this Fork:**
 - **Advanced Banner System**: Custom, condition-based notification banners directly above your thermostat controls.
 - **New Sensor Layouts**: Support for modern `chips` and `badges` layouts in addition to the classic lists and tables.
+- **Circular Dial Setpoint**: An optional native-style circular dial (`setpoint_style: dial`) for the target temperature — draggable, mode-colored, and supporting dual `heat_cool` ranges.
+- **Press-and-Hold Stepping**: Hold a +/- button to keep adjusting the setpoint instead of tapping repeatedly (number and dial styles).
 
 For a detailed list of all new features, bug fixes, and improvements, please check the [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
 <a id="works-well-with"></a>
-## 💡 Works well with
+## 💡 Works well with Tempix
 
 Pair this card with **[Tempix](https://github.com/duczz/ha-tempix)** — a 100% local, self-learning climate-control integration that turns your HVAC systems and smart TRVs into adaptive per-room heating (schedules, presence detection, window sensors, smart preheating). Tempix exposes a standard `climate.tempix_<room>` entity per room, so you can control and visualize each room right from this card.
 
@@ -118,11 +121,13 @@ The card has a built-in visual editor accessible from the HA card picker (pencil
 | **Header** | Show/hide the card header; set a custom name and icon |
 | **Header → Toggle entity** | An optional entity (e.g. `input_boolean`, `switch`) shown as an on/off toggle inside the header |
 | **Header → Toggle label / icon** | The text and icon displayed next to the toggle switch |
+| **Setpoint** | Hide the setpoint controls, pick the setpoint style (`number` or `dial`), and set the step layout / step size |
+| **Mode labels** | Rename any mode or give it a custom icon (e.g. `cool` → "Kühlen"), per mode type the entity supports — writes `control.<type>.<value>.name` / `.icon` |
 | **Mode Controls → Visible mode types** | Toggles to show/hide `preset`, `fan`, and both `swing` (vertical/horizontal) mode button rows, plus optional swing override entities |
 | **Mode Controls → Display** | Show or hide mode button names, icons, and section headings |
 | **Layout & Display** | Decimal places, unit override, step size, step layout, hide rows, and label overrides |
-| **Banners** | Add/remove condition-based alert banners (low battery, window open, device offline, or fully custom) with one-click presets |
-| **Sensors** | Manage built-in (temperature/state) and custom sensors: layout type (list / table / chips / badges), labels, icons, base colors, and per-state icon/text colors |
+| **Banners** | Add/remove/reorder (▲/▼) condition-based alert banners (low battery, window open, device offline, or fully custom) with one-click presets. New banners are inserted pre-sorted by severity; the order can be changed manually |
+| **Sensors** | Manage built-in (temperature/state) and custom sensors: layout type (list / table / chips / badges), labels, icons, base colors, per-state icon/text colors, and ▲/▼ reordering of custom sensors |
 | **Interactions** | `tap_action`, `hold_action`, `double_tap_action` on the temperature display — same options as any HA card |
 | **Fallback text** | Text shown instead of "N/A" when the setpoint value is unavailable, e.g. `--` or `Offline` |
 | **Custom CSS** | Syntax-highlighted CSS editor injected into the card's Shadow DOM — use `--st-*` variables or target any selector. No card-mod required |
@@ -182,7 +187,7 @@ no special support is needed:
 | Option       | Type                  | Default | Description |
 | ------------ | --------------------- | ------- | ----------- |
 | `entity`     | `string`              | **required** | Climate entity id |
-| `current_value_entity` | `string`    | —       | Use a different entity (e.g. a room thermometer) for the displayed current temperature |
+| `current_value_entity` | `string`    | —       | Use a different entity (e.g. a room thermometer) for the displayed current temperature. `current_temperature_entity` is an accepted alias. |
 | `header`     | `false\|object`       | —       | See [Header config](#header-config) |
 | `setpoints`  | `false\|object`       | —       | See [Setpoints config](#setpoints-config) |
 | `layout`     | `object`              | —       | See [Layout options](#layout-options) |
@@ -191,6 +196,8 @@ no special support is needed:
 | `decimals`   | `number`              | `1`     | Number of decimal places |
 | `fallback`   | `string`              | `N/A`   | Text when no setpoint is available |
 | `hide_setpoint` | `boolean`          | `false` | Hide the setpoint up/down controls (keeps mode buttons visible) |
+| `setpoint_style` | `number\|dial`    | `number` | How the target temperature is shown — classic `number` with +/- buttons, or the native circular `dial`. See [Setpoint style](#setpoint-style) |
+| `dial_action_labels` | `object`      | —       | Override the dial's center action label per `hvac_action` (or entity state), e.g. `{ heating: 'Heizt' }`. Unset keys use HA's own translation |
 | `step_size`  | `number`              | auto    | Step for temperature up/down; defaults to the entity's `target_temp_step` attribute |
 | `label`      | `object`              | —       | Override `temperature` / `state` labels |
 | `icon`       | `object`              | —       | Override the icon for the built-in `temperature` / `state` rows, e.g. `icon: { temperature: mdi:thermometer }` |
@@ -222,6 +229,24 @@ layout:
     type: table    # list | table | chips | badges (default: table)
     labels: true   # show sensor labels (default: true)
 ```
+
+<a id="setpoint-style"></a>
+### Setpoint style
+
+Choose how the target temperature is presented:
+
+```yaml
+setpoint_style: dial   # number (default) | dial
+```
+
+- **`number`** (default) — the classic large value with +/- buttons.
+- **`dial`** — the native Home Assistant circular slider (`ha-control-circular-slider`). Drag the ring to set the target; a +/- pair sits below it and the center shows the action (e.g. *Heating*) and the current temperature. When the entity is off, the center reads **Off** instead of a value. The **ring is colored by the current HVAC mode** (reusing the same `--heat-color` / `--cool-color` / … variables as the mode buttons); the center number stays neutral.
+
+The dial works for both single-setpoint entities and **dual `heat_cool`** ranges — a dual entity shows one ring with two handles (low / high) and both targets in the center. It also works for **`fan`** (percentage) and **`humidifier`** (humidity) entities, using the `%` unit and a matching center icon. It requires a Home Assistant core new enough to ship `ha-control-circular-slider` (2024.x+); on older cores the card automatically falls back to the `number` display.
+
+**Holding** an +/- button repeats the step until release (both `number` and `dial` styles). The center action label can be renamed with [`dial_action_labels`](#all-options) (e.g. `{ heating: 'Heizt' }`).
+
+The dial size and layout can be fine-tuned with [CSS variables](#css-variables-for-theming) (`--st-dial-*`, `--st-dial-info-top`, `--st-divider-height`).
 
 ---
 
@@ -323,6 +348,25 @@ control:
 
 > [!WARNING]
 > Quote `"off"` and `"on"` to prevent YAML from interpreting them as booleans.
+
+### Hide a control row while the entity is off
+
+Add `_hide_when_off: true` directly under a mode type to collapse that whole row whenever the entity's HVAC state is `off`. This is handy for secondary controls (preset, fan, swing) that are meaningless when the device is off — the card stays tidy while off and the rows return the moment you switch it back on. Leave `hvac` without the flag so the on/off buttons always stay reachable.
+
+```yaml
+control:
+  hvac: {}              # no flag → stays visible so you can turn it back on
+  preset:
+    _hide_when_off: true
+  fan:
+    _hide_when_off: true
+  swing:
+    _hide_when_off: true
+```
+
+The three most common secondary controls (`preset`, `fan`, `swing`) also expose this as a **"Hide … when off"** toggle in the visual editor's Controls section. In YAML the `_hide_when_off` key works for every mode type, including `swing_vertical` / `swing_horizontal` and `vane_horizontal` / `vane_vertical`.
+
+> 💡 Per-mode **names and icons** (e.g. `cool` → "Kühlen") can be set in the visual editor's **Mode labels** section as well — no need to hand-write the `control` dictionary. A renamed mode shows consistently on the mode buttons, the built-in **State** sensor row, and the dial's center label (an active `idle` action still shows there so you can tell the unit is only idling).
 
 ---
 
@@ -578,6 +622,12 @@ styles: |
 | `--st-mode-border-radius`    | `var(--ha-card-border-radius, 4px)`        | Border radius of mode buttons |
 | `--st-mode-transition`       | `200ms ease`                               | Transition speed for mode button color changes |
 | `--st-header-icon-color`     | `var(--state-icon-color, #44739e)`         | Color of the header icon |
+| `--st-dial-size`             | `160px`                                    | Diameter of the `setpoint_style: dial` ring (capped at 40% of the card body so it shrinks on narrow cards) |
+| `--st-dial-info-top`         | `48%`                                      | Vertical position of the dial's center info stack |
+| `--st-dial-button-size`      | `calc(dial * 0.225)`                       | Size of the dial's +/- buttons |
+| `--st-dial-button-gap`       | `calc(dial * 0.0625)`                      | Gap between the dial's +/- buttons |
+| `--st-dial-button-bottom`    | `0%`                                       | Vertical offset of the +/- button row from the ring bottom |
+| `--st-divider-height`        | `90%`                                      | Length of the divider line between the sensors and the setpoint/dial (as a share of the card body height) |
 
 ### HA theme example
 

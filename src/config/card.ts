@@ -50,6 +50,14 @@ interface CardConfig {
   banners?: false | Array<BannerConfig>
   setpoints?: false | Setpoints
   hide_setpoint?: boolean
+  // 'number' (default): big value with +/- buttons. 'dial': the native HA
+  // circular slider (ha-control-circular-slider) — drag the ring to set the
+  // target. Falls back to 'number' if the element isn't available.
+  setpoint_style?: 'number' | 'dial'
+  // Override the dial's center action label per hvac_action (e.g.
+  // { heating: 'Heizt' }) or per entity state as a fallback. Absent keys fall
+  // back to Home Assistant's own translation.
+  dial_action_labels?: Record<string, string>
   decimals?: number
   step_size?: number
   variables?: LooseObject
