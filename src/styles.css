@@ -417,15 +417,15 @@ header {
   margin: 0;
   font-weight: 400;
   line-height: 1;
-  /* Capped at the configured size, but shrinks with the body width on tight
-     cards (like the dial) so the number + buttons stay inside the card instead
-     of overflowing next to a wide sensor column. */
-  font-size: min(var(--st-font-size-l, clamp(28px, 6vw, 34px)), 10cqw);
+  /* Default: the configured size, untouched. The responsive shrink only kicks
+     in when the setpoint shares the body row with a sensor column (rule below)
+     — a setpoint alone (no sensors) keeps the user's --st-font-size-xl. */
+  font-size: var(--st-font-size-l, clamp(28px, 6vw, 34px));
   cursor: pointer;
   transition: color 200ms ease;
 
   @media (--vp-m) {
-    font-size: min(var(--st-font-size-xl, clamp(34px, 5vw, 45px)), 10cqw);
+    font-size: var(--st-font-size-xl, clamp(34px, 5vw, 45px));
   }
 
   &.updating {
@@ -440,7 +440,7 @@ header {
 }
 
 .current--unit {
-  font-size: min(var(--st-font-size-m, 20px), 4cqw);
+  font-size: var(--st-font-size-m, 20px);
 }
 
 .current--int {
@@ -458,8 +458,32 @@ header {
 }
 
 .current--frac {
-  font-size: min(var(--st-font-size-m, 20px), 4cqw);
+  font-size: var(--st-font-size-m, 20px);
   opacity: 0.9;
+}
+
+/* Responsive shrink for the number setpoint — ONLY when it shares the body row
+   with a (non-empty) sensor column, so it can't push past the card edge there.
+   A setpoint alone keeps its configured size (see .current--value above). */
+.body:has(.sensors:not(:empty)) .current--value {
+  font-size: min(var(--st-font-size-l, clamp(28px, 6vw, 34px)), 10cqw);
+}
+
+@media (--vp-m) {
+  .body:has(.sensors:not(:empty)) .current--value {
+    font-size: min(var(--st-font-size-xl, clamp(34px, 5vw, 45px)), 10cqw);
+  }
+}
+
+.body:has(.sensors:not(:empty)) .current--unit,
+.body:has(.sensors:not(:empty)) .current--frac {
+  font-size: min(var(--st-font-size-m, 20px), 4cqw);
+}
+
+.body:has(.sensors:not(:empty)) .thermostat-trigger {
+  --ha-icon-button-size: min(48px, 11cqw);
+  --mdc-icon-button-size: min(48px, 11cqw);
+  --mdc-icon-size: min(24px, 5.5cqw);
 }
 
 /* Native-style HA circular dial (setpoint_style: dial): the ring, a centered
@@ -615,13 +639,8 @@ header {
 
 .thermostat-trigger {
   padding: 0;
-  /* Native 48px on normal cards, but shrink with the body width on tight cards
-     so the number +/- buttons scale down together with the value. Both the
-     button box AND the glyph scale, otherwise the fixed 24px icon keeps the
-     button looking full-size. (The dial's ha-outlined-icon-button is unaffected.) */
-  --ha-icon-button-size: min(48px, 11cqw);
-  --mdc-icon-button-size: min(48px, 11cqw);
-  --mdc-icon-size: min(24px, 5.5cqw);
+  /* Native size by default; the responsive shrink (box + glyph) only applies
+     when sensors share the row — see the .body:has(.sensors...) rule above. */
 }
 
 .clickable {
