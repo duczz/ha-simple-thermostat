@@ -19,11 +19,11 @@ A beautiful, highly customizable thermostat card for Home Assistant. Seamlessly 
 <br>
 
 <p align="center">
-  <img src="assets/Full_dial.png" width="90%" alt="Full card with banners and sensors">
-  <img src="assets/Full_number.png" width="90%" alt="Full card with banners and sensors">
+  <img src="assets/Full_dial.png" width="49%" alt="Full card with banners and sensors">
+  <img src="assets/Full_number.png" width="49%" alt="Full card with banners and sensors">
 </p>
 <p align="center">
-  <img src="assets/small.png" width="90%" alt="Compact layout">
+  <img src="assets/small.png" width="50%" alt="Compact layout">
 </p>
 
 ---
