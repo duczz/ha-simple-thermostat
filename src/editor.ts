@@ -827,6 +827,34 @@ export default class SimpleThermostatEditor extends LitElement {
     fireEvent(this, 'config-changed', { config: copy })
   }
 
+  // Renders one `expandable` schema section as our own panel instead of letting
+  // ha-form draw it inside its shadow DOM. Reason: there we can style neither
+  // the spacing between sections (HA's own `.root > :not([own-margin])` rule is
+  // unreachable from the light DOM) nor match the chrome of the panels we render
+  // ourselves further down (Mode labels, Banners, Sensors, Custom CSS).
+  //
+  // Safe because the sections carry no `name` — they group visually only, so the
+  // form data stays flat. Each ha-form still gets the *complete* `data` and
+  // reports the complete object back through `_valueChanged`, exactly as the two
+  // big forms did before; only the number of forms changed.
+  _renderFormSection(section: any, data: any) {
+    return html`
+      <ha-expansion-panel outlined ?expanded=${section.expanded === true}>
+        <ha-svg-icon slot="leading-icon" .path=${section.iconPath}></ha-svg-icon>
+        <div slot="header" role="heading" aria-level="3">${section.title}</div>
+        <div class="panel-content">
+          <ha-form
+            .hass=${this.hass}
+            .data=${data}
+            .schema=${section.schema}
+            .computeLabel=${this._computeLabel}
+            @value-changed=${this._valueChanged}
+          ></ha-form>
+        </div>
+      </ha-expansion-panel>
+    `
+  }
+
   render() {
     if (!this.hass || !this.config) return html``
 
@@ -851,33 +879,23 @@ export default class SimpleThermostatEditor extends LitElement {
     return html`
       <div class="card-config">
         <style>
-          .card-config > ha-expansion-panel,
-          .card-config > ha-form {
+          /* Alle Top-Level-Blöcke sind jetzt eigene ha-expansion-panel im Light-DOM;
+             Abstand dazwischen kommt aus gap auf .card-config (styles.css). */
+          .card-config > ha-expansion-panel {
             display: block;
           }
-          /* Spacing kommt aus gap auf .card-config (styles.css) — kein margin-top
-             mehr, das brauchte ein :not(:first-of-type) und traf die Panels innerhalb
-             von ha-form ohnehin nie (Shadow-DOM). */
           .chip ha-icon, .chip ha-state-icon {
             display: flex;
             align-items: center;
             justify-content: center;
           }
         </style>
-        <ha-form
-          .hass=${this.hass}
-          .data=${data}
-          .schema=${schemaBefore}
-          .computeLabel=${this._computeLabel}
-          @value-changed=${this._valueChanged}
-        ></ha-form>
+        ${schemaBefore.map((section: any) => this._renderFormSection(section, data))}
 
         ${modeLabelGroups.length
         ? html`<ha-expansion-panel outlined>
-          <div slot="header" style="display: flex; align-items: center; gap: 8px;">
-            <ha-svg-icon .path=${mdiTagTextOutline}></ha-svg-icon>
-            Mode labels
-          </div>
+          <ha-svg-icon slot="leading-icon" .path=${mdiTagTextOutline}></ha-svg-icon>
+          <div slot="header" role="heading" aria-level="3">Mode labels</div>
           <div class="panel-content">
             <div class="mode-label-hint">
               Rename a mode or give it a custom icon. The key on the left is the
@@ -915,10 +933,8 @@ export default class SimpleThermostatEditor extends LitElement {
         : nothing}
 
         <ha-expansion-panel outlined>
-          <div slot="header" style="display: flex; align-items: center; gap: 8px;">
-            <ha-svg-icon .path=${mdiInformationOutline}></ha-svg-icon>
-            Banners
-          </div>
+          <ha-svg-icon slot="leading-icon" .path=${mdiInformationOutline}></ha-svg-icon>
+          <div slot="header" role="heading" aria-level="3">Banners</div>
           <div class="panel-content">
             ${(this.config.banners || []).map((banner: any, index: number) => {
         const isCollapsed = this._collapsedBanners[index] ?? true
@@ -1014,10 +1030,8 @@ export default class SimpleThermostatEditor extends LitElement {
         </ha-expansion-panel>
 
         <ha-expansion-panel outlined>
-          <div slot="header" style="display: flex; align-items: center; gap: 8px;">
-            <ha-svg-icon .path=${mdiBookOpenVariant}></ha-svg-icon>
-            Sensors
-          </div>
+          <ha-svg-icon slot="leading-icon" .path=${mdiBookOpenVariant}></ha-svg-icon>
+          <div slot="header" role="heading" aria-level="3">Sensors</div>
           <div class="panel-content">
             <ha-form
               style="margin-bottom: 8px;"
@@ -1293,19 +1307,11 @@ export default class SimpleThermostatEditor extends LitElement {
             <ha-button @click=${this._addSensor} outlined style="width: 100%; margin-top: ${this.config?.hide?.temperature || this.config?.hide?.state ? '8px' : '0'};">Add Custom Sensor</ha-button>
           </div>
         </ha-expansion-panel>
-        <ha-form
-          .hass=${this.hass}
-          .data=${data}
-          .schema=${schemaAfter}
-          .computeLabel=${this._computeLabel}
-          @value-changed=${this._valueChanged}
-        ></ha-form>
+        ${schemaAfter.map((section: any) => this._renderFormSection(section, data))}
 
         <ha-expansion-panel outlined>
-          <div slot="header" style="display: flex; align-items: center; gap: 8px;">
-            <ha-svg-icon .path=${mdiCodeBraces}></ha-svg-icon>
-            Custom CSS
-          </div>
+          <ha-svg-icon slot="leading-icon" .path=${mdiCodeBraces}></ha-svg-icon>
+          <div slot="header" role="heading" aria-level="3">Custom CSS</div>
           <div class="panel-content">
             <div class="styles-editor">
               <ha-code-editor

@@ -351,3 +351,70 @@ describe('#15: header.faults survive a show_header off/on round trip', () => {
     expect(onResult.header).toBeUndefined()
   })
 })
+
+// The `expandable` sections used to be handed to one big <ha-form>, which drew
+// them inside its own shadow DOM — unreachable for our spacing and panel chrome
+// (gotcha #10). They are now rendered as our own panels in the light DOM. These
+// tests pin that structure: the previous logic-only suite stayed green through
+// the whole refactor, so it proved nothing about the rendering.
+describe('editor renders every section as its own panel', () => {
+  const renderEditor = async (config: any) => {
+    const el = createEditor(config)
+    el.hass = { states: {} }
+    document.body.appendChild(el)
+    await el.updateComplete
+    return el
+  }
+
+  const cardConfig = (el: any) => el.shadowRoot.querySelector('.card-config')
+
+  // jsdom does not honour `:scope` in element.querySelector*, so direct children
+  // are filtered by tag name instead.
+  const childrenNamed = (parent: any, tag: string): any[] =>
+    [...parent.children].filter((c: any) => c.localName === tag)
+
+  const childBySlot = (parent: any, slot: string): any =>
+    [...parent.children].find((c: any) => c.getAttribute('slot') === slot)
+
+  test('no ha-form is left as a direct child of .card-config', async () => {
+    const el = await renderEditor({ entity: 'climate.test' })
+    expect(childrenNamed(cardConfig(el), 'ha-form')).toHaveLength(0)
+  })
+
+  test('every schema section becomes a top-level panel with its title', async () => {
+    const config = { entity: 'climate.test' }
+    const el = await renderEditor(config)
+    const titles = childrenNamed(cardConfig(el), 'ha-expansion-panel')
+      .map((p) => childBySlot(p, 'header'))
+      .filter(Boolean)
+      .map((h) => h.textContent.trim())
+
+    const sections = buildSchema(config) as any[]
+    expect(sections.length).toBeGreaterThan(0) // guards against a vacuous pass
+    for (const section of sections) {
+      expect(titles).toContain(section.title)
+    }
+    // Our own panels (Banners, Sensors, Custom CSS, ...) sit alongside them.
+    expect(titles.length).toBeGreaterThan(sections.length)
+  })
+
+  test('section panels put their icon in the leading-icon slot, like HA does', async () => {
+    const el = await renderEditor({ entity: 'climate.test' })
+    const panels = childrenNamed(cardConfig(el), 'ha-expansion-panel')
+    expect(panels.length).toBeGreaterThan(0)
+    for (const panel of panels) {
+      expect(childBySlot(panel, 'leading-icon')).toBeDefined()
+      expect(childBySlot(panel, 'header')?.getAttribute('role')).toBe('heading')
+    }
+  })
+
+  test('each section still receives the complete form data, not just its own fields', async () => {
+    const config = { entity: 'climate.test' }
+    const el = await renderEditor(config)
+    const forms = [...cardConfig(el).querySelectorAll('ha-expansion-panel > .panel-content > ha-form')]
+    expect(forms.length).toBeGreaterThan(1)
+    for (const form of forms as any[]) {
+      expect(form.data).toEqual(el._buildFormData())
+    }
+  })
+})
