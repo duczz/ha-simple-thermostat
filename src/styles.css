@@ -72,10 +72,19 @@ ha-icon-button ha-icon {
   grid-auto-flow: column;
   grid-auto-columns: minmax(min-content, auto);
   place-items: center;
+  /* Alignment of the setpoint when it's alone (no sensors) — centered by
+     default, overridable via --st-setpoint-align (e.g. `right`/`left`/`start`).
+     With sensors, the :has(.sensors…) rule below switches to space-between
+     (sensors left / setpoint right). Without this the single grid track would
+     pack to the start (left). */
+  justify-content: var(--st-setpoint-align, center);
   gap: calc(var(--st-spacing, var(--st-default-spacing)) * 4);
   padding-top: 0;
-  padding-left: calc(var(--st-spacing, var(--st-default-spacing)) * 4);
-  padding-right: calc(var(--st-spacing, var(--st-default-spacing)) * 4);
+  /* Small floor so the +/- buttons never touch the card edge, even when a
+     custom --st-spacing: 0 zeroes the derived padding (tunable via
+     --st-body-padding-min). */
+  padding-left: max(var(--st-body-padding-min, 12px), calc(var(--st-spacing, var(--st-default-spacing)) * 4));
+  padding-right: max(var(--st-body-padding-min, 12px), calc(var(--st-spacing, var(--st-default-spacing)) * 4));
   padding-bottom: 0;
 }
 
@@ -417,15 +426,17 @@ header {
   margin: 0;
   font-weight: 400;
   line-height: 1;
-  /* Default: the configured size, untouched. The responsive shrink only kicks
-     in when the setpoint shares the body row with a sensor column (rule below)
-     — a setpoint alone (no sensors) keeps the user's --st-font-size-xl. */
-  font-size: var(--st-font-size-l, clamp(28px, 6vw, 34px));
+  /* Default (no sensors): a GENTLE cqw cap — holds the configured size on normal
+     cards and only shrinks on genuinely narrow ones, so the number + buttons
+     don't clip behind the card edge. The aggressive shrink for the sensor case
+     lives in the `.body:has(.sensors…)` rules below and is intentionally left
+     untouched (that behaviour is dialled in). */
+  font-size: min(var(--st-font-size-l, clamp(28px, 6vw, 34px)), 22cqw);
   cursor: pointer;
   transition: color 200ms ease;
 
   @media (--vp-m) {
-    font-size: var(--st-font-size-xl, clamp(34px, 5vw, 45px));
+    font-size: min(var(--st-font-size-xl, clamp(34px, 5vw, 45px)), 22cqw);
   }
 
   &.updating {
@@ -439,27 +450,15 @@ header {
   }
 }
 
-.current--unit {
-  font-size: var(--st-font-size-m, 20px);
-}
-
-.current--int {
+/* Number style: the unit as a small superscript next to the inline value
+   ("24,5°C"). em-sized so it scales with the number automatically (no-sensor and
+   sensor cases alike); align-self lifts it to the top of the flex row. Targets
+   only the number — the dial's unit lives inside .dial-fu. */
+.current--value .current--unit {
+  font-size: 0.42em;
+  align-self: flex-start;
+  margin-left: 1px;
   line-height: 1;
-}
-
-/* Small column to the right of the big integer: unit on top, decimals below —
-   mirroring HA's ha-big-number (and the dial's center display). */
-.current--fu {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  margin-left: 0;
-  line-height: 1;
-}
-
-.current--frac {
-  font-size: var(--st-font-size-m, 20px);
-  opacity: 0.9;
 }
 
 /* Responsive shrink for the number setpoint — ONLY when it shares the body row
@@ -473,11 +472,6 @@ header {
   .body:has(.sensors:not(:empty)) .current--value {
     font-size: min(var(--st-font-size-xl, clamp(34px, 5vw, 45px)), 10cqw);
   }
-}
-
-.body:has(.sensors:not(:empty)) .current--unit,
-.body:has(.sensors:not(:empty)) .current--frac {
-  font-size: min(var(--st-font-size-m, 20px), 4cqw);
 }
 
 .body:has(.sensors:not(:empty)) .thermostat-trigger {
@@ -639,8 +633,12 @@ header {
 
 .thermostat-trigger {
   padding: 0;
-  /* Native size by default; the responsive shrink (box + glyph) only applies
-     when sensors share the row — see the .body:has(.sensors...) rule above. */
+  /* Default (no sensors): gentle shrink so the +/- buttons don't clip on narrow
+     cards, but stay native 48px otherwise. The aggressive sensor-case shrink is
+     in the .body:has(.sensors...) rule above (untouched). */
+  --ha-icon-button-size: min(48px, 32cqw);
+  --mdc-icon-button-size: min(48px, 32cqw);
+  --mdc-icon-size: min(24px, 16cqw);
 }
 
 .clickable {

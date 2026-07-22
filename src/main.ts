@@ -730,12 +730,10 @@ export default class SimpleThermostat extends LitElement {
           const hasValue = !isOff && ['string', 'number'].includes(typeof value)
           const numericValue = typeof value === 'number' ? value : Number(value)
           const showUnit = unit !== false && hasValue
-          // Split into a big integer part and a small unit/decimals column
-          // stacked to the right (like HA's ha-big-number), matching the dial.
+          // Full number inline ("24,5") with the unit as a small superscript —
+          // the classic temperature look. (The dial keeps the stacked ha-big-
+          // number style separately.)
           const formattedValue = formatNumber(value, { ...config, locale: this._hass?.locale })
-          const numFrac = /^(-?\d+)([.,]\d+)$/.exec(formattedValue)
-          const intPart = numFrac ? numFrac[1] : formattedValue
-          const fracPart = numFrac ? numFrac[2] : ''
           return html`
               <div class="current-wrapper ${stepLayout}">
                 <ha-icon-button
@@ -774,15 +772,8 @@ export default class SimpleThermostat extends LitElement {
                 >
                   ${isOff
               ? this._dialActionLabel(entity)
-              : html`<span class="current--int">${intPart}</span
-                  >${showUnit || fracPart
-                  ? html`<span class="current--fu"
-                      >${showUnit
-                      ? html`<span class="current--unit">${unit}</span>`
-                      : nothing}${fracPart
-                      ? html`<span class="current--frac">${fracPart}</span>`
-                      : nothing}</span
-                    >`
+              : html`${formattedValue}${showUnit
+                  ? html`<span class="current--unit">${unit}</span>`
                   : nothing}`}
                 </h3>
                 <ha-icon-button

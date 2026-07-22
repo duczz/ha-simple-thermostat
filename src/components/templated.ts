@@ -77,6 +77,15 @@ Sqrl.filters.define('debug', (data) => {
 })
 
 export function wrapSensors(config, content) {
+  // Render no `.sensors` element at all when there's nothing to show (e.g. both
+  // built-ins hidden and no custom sensors). An empty-but-present `.sensors`
+  // otherwise makes `:has(.sensors:not(:empty))` match in browsers that don't
+  // treat lit's comment markers as `:empty`, which flips the body layout to
+  // space-between (setpoint left-aligned) instead of centered.
+  if (!content || (Array.isArray(content) && content.filter(Boolean).length === 0)) {
+    return nothing
+  }
+
   const type = config?.layout?.sensors?.type ?? 'table'
   const showLabels = config?.layout?.sensors?.labels ?? true
 

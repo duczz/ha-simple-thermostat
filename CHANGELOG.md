@@ -11,7 +11,8 @@
 
 - **Reorder sensors and banners** — Each custom sensor and each banner now has ▲/▼ buttons in the editor to move it up or down. Banners render in the configured order: new banners are still inserted pre-sorted by severity (error → warning → info → success), but you can now override that order manually and it is honoured.
 - **Mode labels in the visual editor** — A new **Mode labels** section lets you rename a mode or set its icon (e.g. `cool` → "Kühlen") per mode type the entity supports, without hand-writing the `control` dictionary. A renamed mode now shows consistently on the buttons, the built-in **State** sensor row, and the dial's center label — a single rename, applied everywhere.
-- **Number setpoint: stacked unit/decimals** — The `number` style now renders the value like HA's big-number component (large integer with the unit stacked above the decimals), matching the dial. When off it shows the localized (or renamed) off label instead of a hardcoded "OFF".
+- **Number setpoint polish** — The `number` style shows the unit as a small superscript next to the value (e.g. `24,5°C`), scales down gracefully on tight cards, and — when off — shows the localized (or renamed) off label instead of a hardcoded "OFF".
+- **Setpoint alignment & edge spacing** — A card without sensors now centers the setpoint (overridable via `--st-setpoint-align`: `center`/`left`/`right`), and the body keeps a minimum edge padding (`--st-body-padding-min`, default 12px) so the +/- buttons never touch the card edge even with `--st-spacing: 0`.
 - **"Hide when off" mode controls now in the visual editor** — _This is **not** a new feature._ `_hide_when_off` is a long-standing but undocumented option inherited from the original upstream `simple-thermostat` (2020). This release only surfaces it in the editor — a per-row toggle for `preset`, `fan`, and `swing` — and documents the YAML key (which works for every mode type).
 
 ### 🐛 Bug Fixes

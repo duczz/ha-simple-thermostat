@@ -628,6 +628,8 @@ styles: |
 | `--st-dial-button-gap`       | `calc(dial * 0.0625)`                      | Gap between the dial's +/- buttons |
 | `--st-dial-button-bottom`    | `0%`                                       | Vertical offset of the +/- button row from the ring bottom |
 | `--st-divider-height`        | `90%`                                      | Length of the divider line between the sensors and the setpoint/dial (as a share of the card body height) |
+| `--st-setpoint-align`        | `center`                                   | Alignment of the setpoint when the card has no sensors (`center` / `left` / `right` / `start` / `end`). With sensors it is always sensors-left / setpoint-right |
+| `--st-body-padding-min`      | `12px`                                     | Minimum left/right padding of the card body, so the +/- buttons never touch the card edge even when `--st-spacing` is `0` |
 
 ### HA theme example
 
