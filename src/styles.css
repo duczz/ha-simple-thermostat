@@ -752,9 +752,12 @@ header {
   display: flex;
   flex-direction: column;
   /* Abstand zwischen unseren eigenen Top-Level-Blöcken (ha-form, ha-expansion-panel,
-     Footer). Das Innenleben von <ha-form> regelt HA selbst in seinem Shadow-DOM
-     (.root > :not([own-margin]):not(:last-child)) — von hier nicht erreichbar. */
-  gap: 8px;
+     Footer). Bewusst 12px: exakt der Wert, den HA intern zwischen den Sektionen
+     innerhalb von <ha-form> verwendet (.root > :not([own-margin]):not(:last-child)).
+     Dessen Shadow-DOM ist von hier nicht erreichbar — ha-form::part(root) stylt zwar
+     den Container, aber nach ::part() kommt man nicht an dessen Kinder. Also gleichen
+     wir uns an, statt dagegen zu arbeiten. */
+  gap: 12px;
 }
 
 .card-config>ha-selector {
@@ -817,7 +820,7 @@ header {
   padding: 8px 0 4px;
   flex-wrap: wrap;
   border-top: 1px solid var(--divider-color, #e0e0e0);
-  margin-top: 8px;
+  /* kein margin-top: der Abstand kommt aus dem gap von .card-config */
 }
 
 .editor-footer__hint {
