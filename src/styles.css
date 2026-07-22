@@ -751,6 +751,10 @@ header {
 .card-config {
   display: flex;
   flex-direction: column;
+  /* Abstand zwischen unseren eigenen Top-Level-Blöcken (ha-form, ha-expansion-panel,
+     Footer). Das Innenleben von <ha-form> regelt HA selbst in seinem Shadow-DOM
+     (.root > :not([own-margin]):not(:last-child)) — von hier nicht erreichbar. */
+  gap: 8px;
 }
 
 .card-config>ha-selector {

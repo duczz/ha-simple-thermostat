@@ -855,11 +855,9 @@ export default class SimpleThermostatEditor extends LitElement {
           .card-config > ha-form {
             display: block;
           }
-          /* Standard Home Assistant ha-form spacing is 24px between elements */
-          .card-config > ha-expansion-panel,
-          .card-config > ha-form:not(:first-of-type) {
-            margin-top: 24px;
-          }
+          /* Spacing kommt aus gap auf .card-config (styles.css) — kein margin-top
+             mehr, das brauchte ein :not(:first-of-type) und traf die Panels innerhalb
+             von ha-form ohnehin nie (Shadow-DOM). */
           .chip ha-icon, .chip ha-state-icon {
             display: flex;
             align-items: center;
