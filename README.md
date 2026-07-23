@@ -19,11 +19,11 @@ A beautiful, highly customizable thermostat card for Home Assistant. Seamlessly 
 <br>
 
 <p align="center">
-  <img src="assets/Full_dial.png" width="49%" alt="Full card with banners and sensors">
-  <img src="assets/Full_number.png" width="49%" alt="Full card with banners and sensors">
+  <img src="https://raw.githubusercontent.com/duczz/ha-simple-thermostat/main/assets/Full_dial.png" width="49%" alt="Full card with banners and sensors">
+  <img src="https://raw.githubusercontent.com/duczz/ha-simple-thermostat/main/assets/Full_number.png" width="49%" alt="Full card with banners and sensors">
 </p>
 <p align="center">
-  <img src="assets/small.png" width="50%" alt="Compact layout">
+  <img src="https://raw.githubusercontent.com/duczz/ha-simple-thermostat/main/assets/small.png" width="50%" alt="Compact layout">
 </p>
 
 ---
@@ -31,7 +31,7 @@ A beautiful, highly customizable thermostat card for Home Assistant. Seamlessly 
 ## Table of Contents
 
 - [About this fork](#about-this-fork)
-- [Works well with](#works-well-with)
+- [Works well with Tempix](#works-well-with-tempix)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Visual Editor](#visual-editor)
@@ -43,13 +43,12 @@ A beautiful, highly customizable thermostat card for Home Assistant. Seamlessly 
 - [Header config](#header-config)
 - [Setpoints config](#setpoints-config)
 - [Control config](#control-config)
+- [Labels & Translations](#labels-translations)
 - [Sensors config](#sensors-config)
 - [Banners config](#banners-config)
-- [Templated Sensors (version: 3)](#templated-sensors-version-3)
-- [Custom CSS](#custom-css)
-- [CSS variables for theming](#css-variables-for-theming)
-- [Full config example](#full-config-example)
-- [Compact mode](#compact-mode)
+- [Templating Guide](docs/templates.md)
+- [Theming Guide](docs/theming.md)
+- [YAML Config Examples](#yaml-config-examples)
 
 ---
 
@@ -68,7 +67,7 @@ For a detailed list of all new features, bug fixes, and improvements, please che
 
 ---
 
-<a id="works-well-with"></a>
+<a id="works-well-with-tempix"></a>
 ## 💡 Works well with Tempix
 
 Pair this card with **[Tempix](https://github.com/duczz/ha-tempix)** — a 100% local, self-learning climate-control integration that turns your HVAC systems and smart TRVs into adaptive per-room heating (schedules, presence detection, window sensors, smart preheating). Tempix exposes a standard `climate.tempix_<room>` entity per room, so you can control and visualize each room right from this card.
@@ -110,62 +109,23 @@ resources:
 <a id="visual-editor"></a>
 ## 🖱️ Visual Editor
 
-The card has a built-in visual editor accessible from the HA card picker (pencil icon). Most common settings can be configured without touching YAML.
+The card has a built-in visual editor accessible from the HA card picker (pencil icon). The visual editor fully supports configuring almost all layout options, banners, sensors, modes, and controls without touching YAML. Home Assistant's UI tooltips provide inline descriptions for all available fields. For an overview of all visual editor sections, see the [Visual Editor Guide](docs/visual_editor.md).
 
-### Sections
-
-| Section | What it does |
-|---|---|
-| **Entity (required)** | The `climate.*`, `fan.*`, or `humidifier.*` entity to control |
-| **Current temperature entity (optional)** | Override the displayed current temperature with a separate sensor (e.g. a room thermometer) |
-| **Header** | Show/hide the card header; set a custom name and icon |
-| **Header → Toggle entity** | An optional entity (e.g. `input_boolean`, `switch`) shown as an on/off toggle inside the header |
-| **Header → Toggle label / icon** | The text and icon displayed next to the toggle switch |
-| **Setpoint** | Hide the setpoint controls, pick the setpoint style (`number` or `dial`), and set the step layout / step size |
-| **Mode labels** | Rename any mode or give it a custom icon (e.g. `cool` → "Kühlen"), per mode type the entity supports — writes `control.<type>.<value>.name` / `.icon` |
-| **Mode Controls → Visible mode types** | Toggles to show/hide `preset`, `fan`, and both `swing` (vertical/horizontal) mode button rows, plus optional swing override entities |
-| **Mode Controls → Display** | Show or hide mode button names, icons, and section headings |
-| **Layout & Display** | Decimal places, unit override, step size, step layout, hide rows, and label overrides |
-| **Banners** | Add/remove/reorder (▲/▼) condition-based alert banners (low battery, window open, device offline, or fully custom) with one-click presets. New banners are inserted pre-sorted by severity; the order can be changed manually |
-| **Sensors** | Manage built-in (temperature/state) and custom sensors: layout type (list / table / chips / badges), labels, icons, base colors, per-state icon/text colors, and ▲/▼ reordering of custom sensors |
-| **Interactions** | `tap_action`, `hold_action`, `double_tap_action` on the temperature display — same options as any HA card |
-| **Fallback text** | Text shown instead of "N/A" when the setpoint value is unavailable, e.g. `--` or `Offline` |
-| **Custom CSS** | Syntax-highlighted CSS editor injected into the card's Shadow DOM — use `--st-*` variables or target any selector. No card-mod required |
-
-> 💡 **Tip:** Sensors, faults, and other advanced options can only be configured in the YAML (code) editor. Click **All configuration options** in the editor for the full reference.
+> 💡 **Tip:** Advanced options like custom CSS or deeply nested objects can be configured in the YAML (code) editor. Click **All configuration options** in the visual editor for the full reference.
 
 ---
 
 <a id="configuration"></a>
 ## ⚙️ Configuration
 
-To get started quickly, you only need to specify the `type` and your `entity`. This will render the card with all default settings:
+To get started quickly, you only need to specify the `type` and your `entity`. This will render the card with all default settings. The card automatically adapts to the entity type (`climate`, `fan`, or `humidifier`).
 
 ```yaml
 type: custom:simple-thermostat
-entity: climate.my_room
-```
+entity: climate.my_room # Also supports fan.* and humidifier.*
 
-Use a separate sensor for the displayed current temperature (e.g. a room thermometer instead of the thermostat's internal sensor):
-
-```yaml
-type: custom:simple-thermostat
-entity: climate.my_room
-current_value_entity: sensor.living_room_temperature
-```
-
-Control a fan entity (percentage slider + preset / direction / oscillating modes):
-
-```yaml
-type: custom:simple-thermostat
-entity: fan.bedroom_fan
-```
-
-Control a humidifier entity (humidity slider + mode buttons):
-
-```yaml
-type: custom:simple-thermostat
-entity: humidifier.bedroom_humidifier
+# Optional: Use a different sensor for the displayed room temperature
+# current_value_entity: sensor.living_room_temperature
 ```
 
 <a id="showing-multiple-thermostats"></a>
@@ -183,6 +143,9 @@ no special support is needed:
   cards via swipe, arrows, or tabs.
 
 ### All options
+
+<details>
+<summary><b>Show all configuration options</b></summary>
 
 | Option       | Type                  | Default | Description |
 | ------------ | --------------------- | ------- | ----------- |
@@ -212,9 +175,11 @@ no special support is needed:
 | `tap_action` | `object`              | `more-info` | Action when tapping the temperature display |
 | `hold_action`| `object`              | `none`  | Action when holding the temperature display (500 ms) |
 | `double_tap_action`| `object`        | `none`  | Action when double-tapping the temperature display (250 ms) |
-| `styles`     | `string`              | —       | Custom CSS injected into the card — see [Custom CSS](#custom-css) |
-| `version`    | `2\|3`                | `2`     | Set to `3` to enable [Templated Sensors](#templated-sensors-version-3) |
+| `styles`     | `string`              | —       | Custom CSS injected into the card — see [Theming Guide](docs/theming.md) |
+| `version`    | `2\|3`                | `2`     | Set to `3` to enable [Templated Sensors](docs/templates.md) |
 | `variables`  | `object`              | —       | Custom variables available in `version: 3` templates as `v.*` |
+
+</details>
 
 ### Layout options
 
@@ -370,6 +335,28 @@ The three most common secondary controls (`preset`, `fan`, `swing`) also expose 
 
 ---
 
+<a id="labels-translations"></a>
+## 🏷️ Labels & Translations
+
+Override the built-in labels (like "Temperature" and "State") and translate mode buttons (like "cool" to "Kühlen"):
+
+```yaml
+# Override built-in headings
+label:
+  temperature: Raumtemperatur
+  state: Status
+
+# Translate or rename specific mode buttons
+control:
+  hvac:
+    cool:
+      name: Kühlen
+```
+
+> 💡 **Tip:** Mode labels can also be renamed directly inside the Visual Editor's **Mode labels** section.
+
+---
+
 <a id="sensors-config"></a>
 ## 📡 Sensors config
 
@@ -448,205 +435,10 @@ banners:
 
 ---
 
-<a id="templated-sensors-version-3"></a>
-## 🧬 Templated Sensors (version: 3)
+<a id="yaml-config-examples"></a>
+## 📝 YAML Config Examples
 
-Set `version: 3` on the card to enable the template sensor system. Templates are evaluated locally using [Squirrelly](https://squirrelly.js.org/) with your entity's state and attributes available as variables.
-
-### Render a state from another entity
-
-The simplest use case — render the state of a different sensor. The two entries below are equivalent (the second uses the default template explicitly):
-
-```yaml
-type: custom:simple-thermostat
-entity: climate.living_room
-version: 3
-sensors:
-  - entity: sensor.living_room_humidity
-
-  - entity: sensor.living_room_humidity
-    template: '{{state.text}}'
-    label: '{{friendly_name}}'
-```
-
-### Override built-in sensors
-
-Two sensors are built-in by default (`state` and `temperature`). Override them by using their `id`:
-
-```yaml
-type: custom:simple-thermostat
-entity: climate.living_room
-version: 3
-sensors:
-  - id: state
-    label: '{{ui.operation}}'
-    template: '{{state.text}}'
-  - id: temperature
-    label: '{{ui.currently}}'
-    template: '{{current_temperature|formatNumber}}'
-```
-
-> 💡 **Tip:** Use `|formatNumber` on any numeric value to respect your `decimals` config.
-
-### Render attributes from the main entity
-
-All attributes from the climate entity are available directly as variables:
-
-```yaml
-sensors:
-  - label: Min/max temp
-    template: '{{min_temp}} / {{max_temp}}'
-  - label: Supported HVAC modes
-    template: "{{hvac_modes|join(', ')}}"
-```
-
-### Use a different entity as context
-
-Reference another entity — all its attributes become available as variables:
-
-```yaml
-sensors:
-  - label: Temperature
-    entity: sensor.multisensor_living_room
-    template: '{{temperature}} {{unit_of_measurement}}'
-```
-
-### Pass custom variables
-
-Use `variables` to avoid repeating long strings inside templates. This example replaces the built-in State sensor with a dynamic icon:
-
-```yaml
-type: custom:simple-thermostat
-entity: climate.living_room
-version: 3
-variables:
-  icons:
-    idle: 'mdi:sleep'
-    heat: 'mdi:radiator'
-sensors:
-  - id: state
-    label: State
-    template: '{{v.icons[state.raw]|icon}}'
-```
-
-`v` is the shorthand for your `variables` object. `|icon` renders the string as a HA icon element.
-
-### Available template filters
-
-| Filter         | Description                      | Example |
-| -------------- | -------------------------------- | ------- |
-| `icon`         | Render as HA icon                | `{{"mdi:sleep"\|icon}}` |
-| `translate`    | Look up HA translation string    | `{{"on"\|translate("state.default.")}}` |
-| `formatNumber` | Format number to x decimals      | `{{3\|formatNumber({ decimals: 3 })}}` |
-| `join`         | Join array to string             | `{{hvac_modes\|join(', ')}}` |
-| `css`          | Apply inline CSS styles          | `{{state.text\|css({ color: 'red' })}}` |
-| `debug`        | Print value as JSON string       | `{{state\|debug}}` |
-| `relativetime` | Render as relative time          | `{{last_changed\|relativetime}}` |
-
-### Translations (`ui` object)
-
-Access HA's built-in climate UI translations via the `ui` shorthand:
-
-| Key             | Value      |
-| --------------- | ---------- |
-| `ui.currently`  | Currently  |
-| `ui.operation`  | Operation  |
-| `ui.fan_mode`   | Fan mode   |
-| `ui.swing_mode` | Swing mode |
-| `ui.preset_mode`| Preset     |
-
-Custom translation lookup: `{{"on"|translate("state.default.")}}` resolves the key `state.default.on` from HA's translation strings.
-
-
-
----
-
-<a id="custom-css"></a>
-## 🖌️ Custom CSS
-
-Inject arbitrary CSS directly into the card without needing `card-mod`. Use the `styles` config key or edit it visually with syntax highlighting in the visual editor:
-
-```yaml
-type: custom:simple-thermostat
-entity: climate.my_room
-styles: |
-  ha-card {
-    --st-font-size-xl: 24px;
-    --st-mode-active-background: #ff5722;
-  }
-  .current--value {
-    font-weight: 700;
-  }
-```
-
-The CSS is scoped to the card's Shadow DOM. You can override any `--st-*` custom property (see [CSS variables for theming](#css-variables-for-theming)) or target internal selectors directly.
-
-### Styling individual modes
-
-A common use case is giving each active mode button a different color (e.g. blue for cooling, orange for heating). The card has built-in variables for exactly this purpose:
-
-```yaml
-styles: |
-  ha-card {
-    --cool-color: rgba(43, 154, 249, 0.8);
-    --heat-color: rgba(255, 129, 0, 0.8);
-    --auto-color: rgba(0, 128, 0, 0.8);
-    --dry-color: rgba(239, 189, 7, 0.8);
-    --off-color: rgba(138, 138, 138, 0.2);
-  }
-```
-
-> **Note:** `styles` is applied after all built-in styles, so it always takes precedence. You do not need card-mod for per-card overrides.
-
----
-
-<a id="css-variables-for-theming"></a>
-## 🖌️ CSS variables for theming
-
-| Variable                     | Default                                    | Description |
-| ---------------------------- | ------------------------------------------ | ----------- |
-| `--st-font-size-xl`          | `clamp(34px, 5vw, 45px)`                  | Target temperature font size (large screens) |
-| `--st-font-size-l`           | `clamp(28px, 6vw, 34px)`                  | Target temperature font size (small screens) |
-| `--st-font-size-m`           | `20px`                                     | Temperature unit font size |
-| `--st-font-size-title`       | `var(--ha-card-header-font-size, 24px)`    | Card heading font size |
-| `--st-font-size-sensors`     | `16px`                                     | Sensor value font size |
-| `--st-spacing`               | `4px`                                      | Base spacing unit |
-| `--st-mode-active-background`| `var(--primary-color)`                     | Background for the active mode button |
-| `--st-mode-active-color`     | `var(--text-primary-color, #fff)`          | Text color for the active mode button |
-| `--st-mode-background`       | `var(--secondary-background-color)`        | Background for inactive mode buttons |
-| `--st-toggle-label-color`    | `var(--primary-text-color)`                | Toggle label text color |
-| `--st-font-size-toggle-label`| `16px`                                     | Toggle label font size |
-| `--st-fault-inactive-color`  | `var(--secondary-background-color)`        | Fault icon color when inactive |
-| `--st-fault-active-color`    | `var(--accent-color)`                      | Fault icon color when active |
-| `--st-mode-color`            | `var(--secondary-text-color)`              | Text color for inactive mode buttons |
-| `--st-mode-border-radius`    | `var(--ha-card-border-radius, 4px)`        | Border radius of mode buttons |
-| `--st-mode-transition`       | `200ms ease`                               | Transition speed for mode button color changes |
-| `--st-header-icon-color`     | `var(--state-icon-color, #44739e)`         | Color of the header icon |
-| `--st-dial-size`             | `160px`                                    | Diameter of the `setpoint_style: dial` ring (capped at 40% of the card body so it shrinks on narrow cards) |
-| `--st-dial-info-top`         | `48%`                                      | Vertical position of the dial's center info stack |
-| `--st-dial-button-size`      | `calc(dial * 0.225)`                       | Size of the dial's +/- buttons |
-| `--st-dial-button-gap`       | `calc(dial * 0.0625)`                      | Gap between the dial's +/- buttons |
-| `--st-dial-button-bottom`    | `0%`                                       | Vertical offset of the +/- button row from the ring bottom |
-| `--st-divider-height`        | `90%`                                      | Length of the divider line between the sensors and the setpoint/dial (as a share of the card body height) |
-| `--st-setpoint-align`        | `center`                                   | Alignment of the setpoint when the card has no sensors (`center` / `left` / `right` / `start` / `end`). With sensors it is always sensors-left / setpoint-right |
-| `--st-body-padding-min`      | `12px`                                     | Minimum left/right padding of the card body, so the +/- buttons never touch the card edge even when `--st-spacing` is `0` |
-
-### HA theme example
-
-Set variables globally for all Simple Thermostat cards in a theme:
-
-```yaml
-my-theme:
-  st-font-size-xl: 24px
-  st-font-size-m: 20px
-  st-font-size-title: 20px
-  st-spacing: 2px
-```
-
----
-
-<a id="full-config-example"></a>
-## 📝 Full config example
+### Full config
 
 ```yaml
 type: custom:simple-thermostat
@@ -675,10 +467,7 @@ control:
       icon: mdi:fire
 ```
 
----
-
-<a id="compact-mode"></a>
-## 📱 Compact mode
+### Compact mode
 
 A minimalist layout. Hide everything except sensors and temperature control:
 
