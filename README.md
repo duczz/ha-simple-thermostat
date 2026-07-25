@@ -18,13 +18,7 @@ A beautiful, highly customizable thermostat card for Home Assistant. Seamlessly 
 
 <br>
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/duczz/ha-simple-thermostat/main/assets/Full_dial.png" width="49%" alt="Full card with banners and sensors">
-  <img src="https://raw.githubusercontent.com/duczz/ha-simple-thermostat/main/assets/Full_number.png" width="49%" alt="Full card with banners and sensors">
-</p>
-<p align="center">
-  <img src="https://raw.githubusercontent.com/duczz/ha-simple-thermostat/main/assets/small.png" width="50%" alt="Compact layout">
-</p>
+![Simple Thermostat Layouts](assets/hacs_preview.png)
 
 ---
 
