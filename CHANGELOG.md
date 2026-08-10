@@ -11,8 +11,8 @@
 
 ### 📝 Documentation
 
-- **Documentation split out of the README** — The reference moved into `docs/`: [Templating Guide](docs/templates.md), [Theming Guide](docs/theming.md) and [Visual Editor Guide](docs/visual_editor.md). The README is now an overview that links to them instead of carrying everything inline.
-- **New preview image** — A single screenshot showing the dial and number layouts side by side, replacing the previous separate images.
+- **Documentation split out of the README** — The full reference now lives in `docs/`: [Configuration](docs/configuration.md), [Config examples](docs/examples.md), [Templating](docs/templates.md), [Theming](docs/theming.md) and [Visual Editor](docs/visual_editor.md). The README shrank from 483 to 148 lines and is now an overview with a guide index, a getting-started snippet and links.
+- **New preview image** — A single screenshot showing the dial and number layouts side by side, replacing the previous separate images. It is referenced by absolute URL so it also renders in HACS, which resolves relative paths against the installed version's tag.
 
 ### 🐛 Bug Fixes
 
