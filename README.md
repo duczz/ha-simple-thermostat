@@ -18,7 +18,7 @@ A beautiful, highly customizable thermostat card for Home Assistant. Seamlessly 
 
 <br>
 
-![Simple Thermostat Layouts](assets/hacs_preview.png)
+![Simple Thermostat Layouts](assets/Full.png)
 
 ---
 
@@ -199,13 +199,13 @@ setpoint_style: dial   # number (default) | dial
 ```
 
 - **`number`** (default) — the classic large value with +/- buttons.
-- **`dial`** — the native Home Assistant circular slider (`ha-control-circular-slider`). Drag the ring to set the target; a +/- pair sits below it and the center shows the action (e.g. *Heating*) and the current temperature. When the entity is off, the center reads **Off** instead of a value. The **ring is colored by the current HVAC mode** (reusing the same `--heat-color` / `--cool-color` / … variables as the mode buttons); the center number stays neutral.
+- **`dial`** — the native Home Assistant circular slider (`ha-control-circular-slider`). Drag the ring to set the target; a +/- pair sits below it and the center shows the action (e.g. *Heating*) and the current temperature. When the entity is off, the center reads **Off** instead of a value. The **ring is colored by the current HVAC mode** (reusing the same `--st-heat-color` / `--st-cool-color` / … variables as the mode buttons, which follow your Home Assistant theme by default); the center number stays neutral.
 
 The dial works for both single-setpoint entities and **dual `heat_cool`** ranges — a dual entity shows one ring with two handles (low / high) and both targets in the center. It also works for **`fan`** (percentage) and **`humidifier`** (humidity) entities, using the `%` unit and a matching center icon. It requires a Home Assistant core new enough to ship `ha-control-circular-slider` (2024.x+); on older cores the card automatically falls back to the `number` display.
 
 **Holding** an +/- button repeats the step until release (both `number` and `dial` styles). The center action label can be renamed with [`dial_action_labels`](#all-options) (e.g. `{ heating: 'Heizt' }`).
 
-The dial size and layout can be fine-tuned with [CSS variables](#css-variables-for-theming) (`--st-dial-*`, `--st-dial-info-top`, `--st-divider-height`).
+The dial size and layout can be fine-tuned with [CSS variables](docs/theming.md#dial-setpoint_style-dial) (`--st-dial-size`, `--st-dial-info-top`, `--st-divider-height`).
 
 ---
 
@@ -324,6 +324,8 @@ control:
 ```
 
 The three most common secondary controls (`preset`, `fan`, `swing`) also expose this as a **"Hide … when off"** toggle in the visual editor's Controls section. In YAML the `_hide_when_off` key works for every mode type, including `swing_vertical` / `swing_horizontal` and `vane_horizontal` / `vane_vertical`.
+
+The **setpoint** needs no flag: while a `climate` entity is off it shows the action label instead of a value, and its +/- buttons are disabled — Home Assistant ignores `set_temperature` in that state anyway. `fan` and `humidifier` entities stay adjustable while off, because setting their percentage / humidity is a meaningful command there.
 
 > 💡 Per-mode **names and icons** (e.g. `cool` → "Kühlen") can be set in the visual editor's **Mode labels** section as well — no need to hand-write the `control` dictionary. A renamed mode shows consistently on the mode buttons, the built-in **State** sensor row, and the dial's center label (an active `idle` action still shows there so you can tell the unit is only idling).
 

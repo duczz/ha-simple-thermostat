@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import SimpleThermostatEditor, { buildSchema } from '../editor'
+import { THEMING_VARS } from '../config/themingVars'
 
 const TAG = 'simple-thermostat-editor-test'
 if (!customElements.get(TAG)) {
@@ -416,5 +417,17 @@ describe('editor renders every section as its own panel', () => {
     for (const form of forms as any[]) {
       expect(form.data).toEqual(el._buildFormData())
     }
+  })
+
+  test('the Custom CSS panel lists every public CSS variable', async () => {
+    // Discoverability is the whole point of the list — a structural regress
+    // here is invisible without a render test (see the 2026-07-22 lesson).
+    const el = await renderEditor({ entity: 'climate.test' })
+    const rendered = [...cardConfig(el).querySelectorAll('.css-vars__list code')].map(
+      (c: any) => c.textContent.trim()
+    )
+    const expected = THEMING_VARS.flatMap((group) => group.variables)
+    expect(expected.length).toBeGreaterThan(40) // guards against a vacuous pass
+    expect(rendered.sort()).toEqual([...expected].sort())
   })
 })

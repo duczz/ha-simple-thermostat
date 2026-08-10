@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.4.2] – 2026-08-10
+
+### 🎨 Theming
+
+- **Mode colors now follow your Home Assistant theme** — They use HA's own state colors instead of hardcoded values, so the card matches HA's built-in thermostat and tile cards. **Two colors change visibly:** `heat_cool` is now amber (was spring green), `fan_only` cyan (was grey). To keep the old look or set your own, see the [Theming Guide](docs/theming.md#mode-colors-follow-your-home-assistant-theme).
+- **A complete set of CSS variables** — The theming API grew from 21 to 53 documented variables, covering things that previously had no hook at all: setpoint color, unit size, mode button icons and hover, card title, sensor labels and values, chips, badges and banners. Every one defaults to the previous value, so nothing changes until you set one. Full reference in the [Theming Guide](docs/theming.md#variable-reference).
+- **Variable reference in the visual editor** — The Custom CSS panel now lists every available variable, grouped by area, right above the code editor. No more switching to the docs to look up a name.
+- **Rewritten [Theming Guide](docs/theming.md)** — Grouped reference tables per area plus copy-paste recipes for the most common requests.
+
+### 📝 Documentation
+
+- **Documentation split out of the README** — The reference moved into `docs/`: [Templating Guide](docs/templates.md), [Theming Guide](docs/theming.md) and [Visual Editor Guide](docs/visual_editor.md). The README is now an overview that links to them instead of carrying everything inline.
+- **New preview image** — A single screenshot showing the dial and number layouts side by side, replacing the previous separate images.
+
+### 🐛 Bug Fixes
+
+- **`--st-font-size-m` had no effect** — The variable was documented from the first release on but never existed in the stylesheet, so setting it did nothing. It now controls the unit size next to the setpoint. A new test keeps the documented variables and the stylesheet in sync so this cannot happen again.
+- **Setpoint +/- buttons on a switched-off climate entity** — They stayed clickable while the display already showed the off label, firing `set_temperature` calls that Home Assistant ignores in that state. They are disabled now, matching the dial. `fan` and `humidifier` entities stay adjustable while off, since setting their percentage / humidity is a meaningful command there.
+
+### 🔒 Security
+
+- **Build-chain dependencies hardened** — Pinned `shell-quote`, `serialize-javascript`, `svgo`, `undici` and `nanoid` past known advisories via `overrides`, and updated `postcss`. This removes 8 of 9 reported vulnerabilities (including both critical ones). None of these packages ship in `dist/` — they are toolchain only.
+
 ## [2.4.1] – 2026-07-21
 
 ### ✨ New Features (Fork-Exclusive)

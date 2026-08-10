@@ -49,6 +49,12 @@ export interface EntityAdapter {
   /** Optional value transform when sending a mode payload (e.g. fan `oscillating` expects boolean from a 'true'/'false' string). */
   transformModePayloadValue?(type: string, value: string): any
 
+  /** Whether the setpoint is locked while the entity is `off`. Climate ignores
+   * `set_temperature` in `off`, so stepping it fires no-op service calls; fan
+   * (`percentage`) and humidifier (`set_humidity`) stay adjustable. Omitted =
+   * not locked. */
+  lockSetpointWhenOff?(): boolean
+
   /** Entity domain used for HA translation keys (`component.<domain>.state.*`, `ui.card.<domain>.*`). */
   getLocalizationDomain(): string
 }

@@ -727,6 +727,11 @@ export default class SimpleThermostat extends LitElement {
               )
           : Object.entries(_values).map(([field, value]) => {
           const isOff = entity.state === HVAC_MODES.OFF
+          // A switched-off climate entity ignores set_temperature, so the +/-
+          // buttons would fire no-op service calls while the display already
+          // shows the off label. Fan/humidifier stay adjustable (their adapter
+          // doesn't lock). Matches the dial, which is disabled when off.
+          const lockedWhileOff = isOff && (renderAdapter.lockSetpointWhenOff?.() ?? false)
           const hasValue = !isOff && ['string', 'number'].includes(typeof value)
           const numericValue = typeof value === 'number' ? value : Number(value)
           const showUnit = unit !== false && hasValue
@@ -737,7 +742,7 @@ export default class SimpleThermostat extends LitElement {
           return html`
               <div class="current-wrapper ${stepLayout}">
                 <ha-icon-button
-                  ?disabled=${(value === null && minTemp === null) || (value !== null && maxTemp !== null && numericValue >= maxTemp)}
+                  ?disabled=${lockedWhileOff || (value === null && minTemp === null) || (value !== null && maxTemp !== null && numericValue >= maxTemp)}
                   class="thermostat-trigger thermostat-trigger--up"
                   aria-label="Increase ${field}"
                   .label=${`Increase ${field}`}
@@ -777,7 +782,7 @@ export default class SimpleThermostat extends LitElement {
                   : nothing}`}
                 </h3>
                 <ha-icon-button
-                  ?disabled=${value === null || (minTemp !== null && numericValue <= minTemp)}
+                  ?disabled=${lockedWhileOff || value === null || (minTemp !== null && numericValue <= minTemp)}
                   class="thermostat-trigger thermostat-trigger--down"
                   aria-label="Decrease ${field}"
                   .label=${`Decrease ${field}`}

@@ -73,9 +73,8 @@ describe('updateFromHass basics', () => {
     // LitElement performs one render pass right after connectedCallback
     // regardless of property changes, so render() can run with `this.config`
     // still undefined if some dashboard/editor code path assigns `hass`
-    // before ever calling `setConfig` (found while cross-checking a fix in
-    // an upstream fork's changelog: "Kept the latest Home Assistant state
-    // when hass arrives before setConfig").
+    // before ever calling `setConfig` (found while reviewing the card's
+    // lifecycle handling).
     const el = document.createElement(TAG) as any
     el.hass = makeHass({ 'climate.test': climateEntity() }) // setConfig never called
     expect(() => el.render()).not.toThrow()
@@ -281,5 +280,49 @@ describe('#23: pending setTemperature is flushed on disconnect, not dropped', ()
     el.remove()
     vi.advanceTimersByTime(1000)
     expect(performAction).not.toHaveBeenCalled()
+  })
+})
+
+describe('setpoint steppers while the entity is off', () => {
+  // Renders the number-style setpoint and returns the +/- buttons.
+  const steppers = (config: any, hass: any) => {
+    const el = createCard(config, hass)
+    const container = document.createElement('div')
+    render(el.render(), container)
+    return Array.from(container.querySelectorAll('.thermostat-trigger'))
+  }
+
+  test('climate: both buttons are disabled when the entity is off', () => {
+    // set_temperature is a no-op on an off climate entity, and the display
+    // already shows the off label instead of a value.
+    const buttons = steppers(
+      { entity: 'climate.test' },
+      makeHass({ 'climate.test': climateEntity({ state: 'off' }) })
+    )
+    expect(buttons.length).toBe(2)
+    expect(buttons.every((b) => b.hasAttribute('disabled'))).toBe(true)
+  })
+
+  test('climate: buttons stay enabled while the entity is on', () => {
+    const buttons = steppers(
+      { entity: 'climate.test' },
+      makeHass({ 'climate.test': climateEntity() }) // state: heat, 21 °C within 7-35
+    )
+    expect(buttons.length).toBe(2)
+    expect(buttons.some((b) => b.hasAttribute('disabled'))).toBe(false)
+  })
+
+  test('fan: buttons stay enabled when off — set_percentage also turns it on', () => {
+    const fan = {
+      entity_id: 'fan.test',
+      state: 'off',
+      attributes: { friendly_name: 'Test Fan', percentage: 40 },
+    }
+    const buttons = steppers(
+      { entity: 'fan.test' },
+      makeHass({ 'fan.test': fan })
+    )
+    expect(buttons.length).toBe(2)
+    expect(buttons.some((b) => b.hasAttribute('disabled'))).toBe(false)
   })
 })

@@ -4,7 +4,6 @@
   --st-default-spacing: 4px;
   --st-default-mode-radius: var(--ha-card-border-radius, 4px);
   --st-default-mode-transition: 200ms ease;
-  --st-default-icon-color: var(--state-icon-color, var(--secondary-text-color));
 }
 
 ha-card {
@@ -16,13 +15,24 @@ ha-card {
   padding-right: 0px;
   padding-bottom: 8px;
 
-  --auto-color: green;
-  --heat_cool-color: springgreen;
-  --cool-color: #2b9af9;
-  --heat-color: #ff8100;
-  --off-color: #8a8a8a;
-  --fan_only-color: #8a8a8a;
-  --dry-color: #efbd07;
+  /* Mode colors, three layers deep:
+       1. --st-<mode>-color   — per-card override (documented API)
+       2. --state-climate-*   — HA's own state colors, so the card follows the
+                                active theme. Present since HA 2023 and in every
+                                version we support (min 2024.8), which makes the
+                                literals below effectively a last-resort fallback.
+                                Note HA's spelling: `heat-cool` hyphenated but
+                                `fan_only` with an underscore.
+       3. literal             — only if HA ever drops the variables.
+     The legacy names (--cool-color etc.) stay the outer name on purpose: configs
+     that set them keep overriding this whole declaration, as documented. */
+  --auto-color: var(--st-auto-color, var(--state-climate-auto-color, green));
+  --heat_cool-color: var(--st-heat_cool-color, var(--state-climate-heat-cool-color, springgreen));
+  --cool-color: var(--st-cool-color, var(--state-climate-cool-color, #2b9af9));
+  --heat-color: var(--st-heat-color, var(--state-climate-heat-color, #ff8100));
+  --off-color: var(--st-off-color, var(--state-inactive-color, #8a8a8a));
+  --fan_only-color: var(--st-fan_only-color, var(--state-climate-fan_only-color, #8a8a8a));
+  --dry-color: var(--st-dry-color, var(--state-climate-dry-color, #efbd07));
 }
 
 ha-card.no-header {
@@ -96,7 +106,7 @@ ha-icon-button ha-icon {
 
 .toggle-icon {
   margin-right: calc(var(--st-spacing, var(--st-default-spacing)) * 2);
-  color: var(--state-icon-color, var(--secondary-text-color));
+  color: var(--st-toggle-icon-color, var(--state-icon-color, var(--secondary-text-color)));
   --mdc-icon-size: 24px;
 }
 
@@ -149,7 +159,7 @@ ha-icon-button ha-icon {
   justify-content: flex-start;
 
   .chip {
-    background: transparent;
+    background: var(--st-chip-background, transparent);
     border-radius: 16px;
     padding: 4px 6px;
     display: flex;
@@ -198,13 +208,13 @@ ha-icon-button ha-icon {
   justify-content: flex-start;
 
   .st-badge {
-    background: transparent;
+    background: var(--st-badge-background, transparent);
     border-radius: 16px;
     padding: 4px 6px;
     display: flex;
     align-items: center;
     gap: 6px;
-    color: var(--primary-text-color);
+    color: var(--st-badge-color, var(--primary-text-color));
     border: none;
     transition: background-color 0.2s ease, opacity 0.2s ease;
   }
@@ -269,6 +279,10 @@ ha-icon-button ha-icon {
 .sensor-value {
   display: flex;
   align-items: center;
+  /* `inherit` keeps the untouched behaviour: without the hook these elements
+     simply inherit their color, exactly as before. A per-sensor state_text_color
+     writes an inline style and still wins over this. */
+  color: var(--st-sensor-value-color, inherit);
 }
 
 .sensor-value-full {
@@ -280,6 +294,7 @@ ha-icon-button ha-icon {
 
 .sensor-heading {
   font-weight: 300;
+  color: var(--st-sensor-label-color, inherit);
   padding-right: 8px;
   white-space: nowrap;
   display: flex;
@@ -326,7 +341,8 @@ header {
 .header__title {
   font-size: var(--st-font-size-title, var(--ha-card-header-font-size, 24px));
   line-height: var(--st-font-size-title, var(--ha-card-header-font-size, 24px));
-  font-weight: normal;
+  font-weight: var(--st-font-weight-title, normal);
+  color: var(--st-title-color, inherit);
   margin: 0;
   align-self: flex-start;
 }
@@ -417,7 +433,7 @@ header {
   transform: translateY(-50%);
   width: 1px;
   height: var(--st-divider-height, 90%);
-  background-color: var(--divider-color, #e0e0e0);
+  background-color: var(--st-divider-color, var(--divider-color, #e0e0e0));
 }
 
 .current--value {
@@ -425,6 +441,7 @@ header {
   align-items: center;
   margin: 0;
   font-weight: 400;
+  color: var(--st-setpoint-color, inherit);
   line-height: 1;
   /* Default (no sensors): a GENTLE cqw cap — holds the configured size on normal
      cards and only shrinks on genuinely narrow ones, so the number + buttons
@@ -440,7 +457,7 @@ header {
   }
 
   &.updating {
-    color: var(--error-color);
+    color: var(--st-value-update-color, var(--error-color));
   }
 
   &:focus-visible {
@@ -455,7 +472,8 @@ header {
    sensor cases alike); align-self lifts it to the top of the flex row. Targets
    only the number — the dial's unit lives inside .dial-fu. */
 .current--value .current--unit {
-  font-size: 0.42em;
+  /* --st-font-size-m is the historic name from the docs and stays supported. */
+  font-size: var(--st-font-size-unit, var(--st-font-size-m, 0.42em));
   align-self: flex-start;
   margin-left: 1px;
   line-height: 1;
@@ -551,7 +569,7 @@ header {
 }
 
 .dial-target.updating {
-  color: var(--error-color);
+  color: var(--st-value-update-color, var(--error-color));
 }
 
 /* Dual (heat_cool): both targets side by side inside the ring. Smaller than the
@@ -568,7 +586,7 @@ header {
 }
 
 .dial-dual-targets.updating {
-  color: var(--error-color);
+  color: var(--st-value-update-color, var(--error-color));
 }
 
 .dial-dual-unit {
@@ -628,7 +646,7 @@ header {
 .dial-buttons ha-outlined-icon-button {
   width: var(--st-dial-button-size, calc(var(--_dial) * 0.225));
   height: var(--st-dial-button-size, calc(var(--_dial) * 0.225));
-  color: var(--primary-text-color);
+  color: var(--st-dial-button-color, var(--primary-text-color));
 }
 
 .thermostat-trigger {
@@ -661,7 +679,7 @@ header {
 .mode-title {
   padding: 0 16px;
   place-self: center;
-  font-size: var(--st-font-size-sensors, var(--ha-font-size-l, 16px));
+  font-size: var(--st-font-size-mode-title, var(--st-font-size-sensors, var(--ha-font-size-l, 16px)));
   font-weight: 300;
   white-space: nowrap;
 }
@@ -689,7 +707,7 @@ header {
   user-select: none;
 
   &:hover {
-    color: var(--st-mode-active-color, var(--primary-text-color));
+    color: var(--st-mode-hover-color, var(--st-mode-active-color, var(--primary-text-color)));
   }
 
   &:active {
@@ -739,9 +757,16 @@ header {
 }
 
 .mode-icon {
-  --mdc-icon-size: 24px;
+  --mdc-icon-size: var(--st-mode-icon-size, 24px);
   --ha-icon-display: block;
   display: block;
+  /* Without the hook the icon keeps inheriting the button's text color, i.e.
+     --st-mode-color / --st-mode-active-color as before. */
+  color: var(--st-mode-icon-color, inherit);
+}
+
+.mode-item.active .mode-icon {
+  color: var(--st-mode-active-icon-color, var(--st-mode-icon-color, inherit));
 }
 
 .card-config ha-switch {
@@ -779,6 +804,18 @@ header {
 
 .mode-label-group {
   margin-bottom: 8px;
+}
+
+/* Reference list of the public CSS variables inside the Custom CSS panel.
+   Wraps freely so the names stay readable on a narrow editor pane. */
+.css-vars {
+  margin-top: 8px;
+}
+
+.css-vars__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .mode-label-heading {
@@ -864,9 +901,9 @@ header {
   gap: 10px;
   padding: 8px 12px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--st-font-size-banner, 13px);
   font-weight: 500;
-  background-color: var(--secondary-background-color, rgba(120, 120, 120, 0.08));
+  background-color: var(--st-banner-background, var(--secondary-background-color, rgba(120, 120, 120, 0.08)));
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   animation: st-slide-down 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
   opacity: 0;
@@ -886,7 +923,7 @@ header {
 
 .st-banner-warning {
   border-left: 4px solid var(--warning-color, #ffc107);
-  color: var(--primary-text-color);
+  color: var(--st-banner-text-color, var(--primary-text-color));
 }
 
 .st-banner-warning ha-icon {
@@ -895,7 +932,7 @@ header {
 
 .st-banner-error {
   border-left: 4px solid var(--error-color, #f44336);
-  color: var(--primary-text-color);
+  color: var(--st-banner-text-color, var(--primary-text-color));
 }
 
 .st-banner-error ha-icon {
@@ -904,7 +941,7 @@ header {
 
 .st-banner-info {
   border-left: 4px solid var(--info-color, #2196f3);
-  color: var(--primary-text-color);
+  color: var(--st-banner-text-color, var(--primary-text-color));
 }
 
 .st-banner-info ha-icon {
@@ -913,7 +950,7 @@ header {
 
 .st-banner-success {
   border-left: 4px solid var(--success-color, #4caf50);
-  color: var(--primary-text-color);
+  color: var(--st-banner-text-color, var(--primary-text-color));
 }
 
 .st-banner-success ha-icon {

@@ -66,4 +66,8 @@ export const climateAdapter: EntityAdapter = {
   getLocalizationDomain(): string {
     return 'climate'
   },
+
+  lockSetpointWhenOff(): boolean {
+    return true
+  },
 }

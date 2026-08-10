@@ -11,6 +11,7 @@ import { getAdapter, EntityAdapter } from './adapters'
 import { isObject } from './utils'
 import { mergeBannerFormData } from './config/bannerForm'
 import { applyFormChange, shiftCollapseState } from './config/editorForm'
+import { THEMING_VARS } from './config/themingVars'
 
 declare const process: { env: { BUILD_TIME: string } }
 const BUILD_TIME = process.env.BUILD_TIME
@@ -1324,6 +1325,28 @@ export default class SimpleThermostatEditor extends LitElement {
                 @value-changed=${this._stylesChanged}
               ></ha-code-editor>
             </div>
+            <ha-expansion-panel outlined class="css-vars">
+              <div slot="header" role="heading" aria-level="4">Available CSS variables</div>
+              <div class="panel-content">
+                <div class="mode-label-hint">
+                  Set these on <code class="mode-label-key">ha-card</code> to restyle the
+                  card. Every variable falls back to the current look, so only what
+                  you set changes.
+                </div>
+                ${THEMING_VARS.map(
+              (group) => html`
+                  <div class="mode-label-group">
+                    <div class="mode-label-heading">${group.label}</div>
+                    <div class="css-vars__list">
+                      ${group.variables.map(
+                (name) => html`<code class="mode-label-key">${name}</code>`
+              )}
+                    </div>
+                  </div>
+                `
+            )}
+              </div>
+            </ha-expansion-panel>
           </div>
         </ha-expansion-panel>
 
