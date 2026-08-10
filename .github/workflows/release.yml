@@ -59,11 +59,21 @@ jobs:
             --repo "${{ github.repository }}" \
             --clobber
 
-      - name: Update release body from CHANGELOG
+      # Only fills in the body when the release was published without one, so a
+      # hand-written announcement text survives. `CURRENT_BODY` is passed through
+      # `env` on purpose — interpolating it into the script would execute
+      # backticks or $(…) contained in the release text.
+      - name: Update release body from CHANGELOG (only if empty)
         if: hashFiles('release-body.md') != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURRENT_BODY: ${{ github.event.release.body }}
         run: |
+          if [ -n "$(printf '%s' "$CURRENT_BODY" | tr -d '[:space:]')" ]; then
+            echo "Release already has a body — leaving it untouched."
+            exit 0
+          fi
+          echo "Release body is empty — filling it from the CHANGELOG."
           gh release edit "${{ github.event.release.tag_name }}" \
             --repo "${{ github.repository }}" \
             --notes-file release-body.md
