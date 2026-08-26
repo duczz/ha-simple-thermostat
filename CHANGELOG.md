@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.4.3] – 2026-08-26
+
+A maintenance release: no new features and nothing changes visually.
+
+### 🐛 Bug Fixes
+
+- **A queued temperature change could land on the wrong device** — Adjusting the setpoint and then switching the card to a different entity within half a second (the debounce window) sent the queued value to the *newly selected* entity instead of the one it was made for. Affects the visual editor, whose live preview reuses the same card element and controls real devices. The queued change now carries its own entity and service, and is sent before the configuration is swapped.
+- **Switching entity carried the previous setpoint over** — After changing the card to another entity while a setpoint change was still in flight, the card kept showing the previous device's target temperature, and the next +/- step wrote that value to the new device. The new entity's values are now read from Home Assistant.
+- **Failed actions are no longer silent** — When Home Assistant rejected an action (entity removed, service refused, connection lost), the card dropped the rejected promise. Nothing showed up in the browser console, and the stack trace that did appear pointed into Home Assistant's own code with no hint at which card caused it. Failures are now logged with the action that failed. As before, the displayed value corrects itself on the next state update.
+
+### 🧹 Internal
+
+- **Stale entity references cleaned up** — Removing a sensor (or any other tracked entity) from the card's configuration left its state reference behind in the update-tracking map for as long as the card stayed on the dashboard. Housekeeping only — no behaviour changed.
+- **CodeQL static analysis** — Security scanning for JavaScript/TypeScript now runs on every push and pull request, plus weekly.
+
 ## [2.4.2] – 2026-08-10
 
 ### 🎨 Theming
