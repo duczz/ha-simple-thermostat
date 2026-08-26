@@ -386,6 +386,92 @@ describe('setpoint steppers while the entity is off', () => {
   })
 })
 
+describe('dual setpoints cannot be stepped past each other', () => {
+  // heat_cool entity: low and high are rendered as two number-style steppers.
+  const dualEntity = (low: number, high: number) => ({
+    entity_id: 'climate.dual',
+    state: 'heat_cool',
+    attributes: {
+      friendly_name: 'Dual',
+      target_temp_low: low,
+      target_temp_high: high,
+      current_temperature: 22,
+      min_temp: 7,
+      max_temp: 35,
+      hvac_modes: ['off', 'heat_cool'],
+    },
+  })
+
+  // Returns the four buttons in render order: low+, low-, high+, high-
+  const buttons = (low: number, high: number) => {
+    const el = createCard(
+      { entity: 'climate.dual' },
+      makeHass({ 'climate.dual': dualEntity(low, high) })
+    )
+    const container = document.createElement('div')
+    render(el.render(), container)
+    const all = Array.from(container.querySelectorAll('.thermostat-trigger'))
+    return {
+      el,
+      lowUp: all[0],
+      lowDown: all[1],
+      highUp: all[2],
+      highDown: all[3],
+    }
+  }
+
+  test('low cannot be raised to meet high once they are equal', () => {
+    // HA Core rejects target_temp_low > target_temp_high outright, so the UI
+    // must not offer the step that produces it.
+    const b = buttons(24, 24)
+    expect(b.lowUp.hasAttribute('disabled')).toBe(true)
+    expect(b.highDown.hasAttribute('disabled')).toBe(true)
+    // The other direction stays open — the range can still be widened.
+    expect(b.lowDown.hasAttribute('disabled')).toBe(false)
+    expect(b.highUp.hasAttribute('disabled')).toBe(false)
+  })
+
+  test('equal values are allowed — the bound is inclusive, matching HA', () => {
+    const b = buttons(23.5, 24)
+    expect(b.lowUp.hasAttribute('disabled')).toBe(false) // 23.5 -> 24 is legal
+    expect(b.el._stepSetpoint('target_temp_low', 1, 7, 35)).toBe(true)
+    expect(b.el._values.target_temp_low).toBe(24)
+  })
+
+  test('a well-separated range leaves every button usable', () => {
+    const b = buttons(20, 24)
+    for (const key of ['lowUp', 'lowDown', 'highUp', 'highDown'] as const) {
+      expect(b[key].hasAttribute('disabled')).toBe(false)
+    }
+  })
+
+  test('an already-invalid range from HA stays escapable, not locked', () => {
+    // Some integration reports low > high. The user must be able to correct it.
+    const b = buttons(25, 24)
+    expect(b.lowUp.hasAttribute('disabled')).toBe(true) // no worse
+    expect(b.highDown.hasAttribute('disabled')).toBe(true) // no worse
+    expect(b.lowDown.hasAttribute('disabled')).toBe(false) // but recoverable
+    expect(b.highUp.hasAttribute('disabled')).toBe(false)
+  })
+
+  test('the step function refuses what the disabled button hides', () => {
+    // Press-and-hold drives _stepSetpoint directly, so both layers must agree.
+    const b = buttons(24, 24)
+    expect(b.el._stepSetpoint('target_temp_low', 1, 7, 35)).toBe(false)
+    expect(b.el._stepSetpoint('target_temp_high', -1, 7, 35)).toBe(false)
+    expect(b.el._stepSetpoint('target_temp_low', -1, 7, 35)).toBe(true)
+  })
+
+  test('single-setpoint entities are unaffected — no sibling to clamp against', () => {
+    const el = createCard(
+      { entity: 'climate.test' },
+      makeHass({ 'climate.test': climateEntity() }) // temperature: 21, 7-35
+    )
+    expect(el._stepSetpoint('temperature', 1, 7, 35)).toBe(true)
+    expect(el._values.temperature).toBe(21.5)
+  })
+})
+
 describe('_trackedStateRefs is pruned when the config stops tracking an entity', () => {
   const sensor = { entity_id: 'sensor.extra', state: '25', attributes: {} }
 

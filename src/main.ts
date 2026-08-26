@@ -43,6 +43,14 @@ const STEP_SIZE = 0.5
 const DECIMALS = 1
 const UPDATING_TIMEOUT = 10000
 
+// A heat_cool entity has two setpoints that must not cross — HA Core rejects
+// target_temp_low > target_temp_high with a ServiceValidationError. Each one
+// therefore caps the other's range; see _setpointBounds.
+const SETPOINT_SIBLING: Record<string, { field: string; caps: 'min' | 'max' }> = {
+  target_temp_low: { field: 'target_temp_high', caps: 'max' },
+  target_temp_high: { field: 'target_temp_low', caps: 'min' },
+}
+
 const ICONS = {
   UP: 'hass:chevron-up',
   DOWN: 'hass:chevron-down',
@@ -796,6 +804,10 @@ export default class SimpleThermostat extends LitElement {
           const lockedWhileOff = isOff && (renderAdapter.lockSetpointWhenOff?.() ?? false)
           const hasValue = !isOff && ['string', 'number'].includes(typeof value)
           const numericValue = typeof value === 'number' ? value : Number(value)
+          // On a dual entity the sibling setpoint narrows this one's range, so
+          // the buttons grey out at the crossing point instead of offering a
+          // step HA would reject. Same source as _stepSetpoint below.
+          const bounds = this._setpointBounds(field, minTemp, maxTemp)
           const showUnit = unit !== false && hasValue
           // Full number inline ("24,5") with the unit as a small superscript —
           // the classic temperature look. (The dial keeps the stacked ha-big-
@@ -804,7 +816,7 @@ export default class SimpleThermostat extends LitElement {
           return html`
               <div class="current-wrapper ${stepLayout}">
                 <ha-icon-button
-                  ?disabled=${lockedWhileOff || (value === null && minTemp === null) || (value !== null && maxTemp !== null && numericValue >= maxTemp)}
+                  ?disabled=${lockedWhileOff || (value === null && bounds.min === null) || (value !== null && bounds.max !== null && numericValue >= bounds.max)}
                   class="thermostat-trigger thermostat-trigger--up"
                   aria-label="Increase ${field}"
                   .label=${`Increase ${field}`}
@@ -844,7 +856,7 @@ export default class SimpleThermostat extends LitElement {
                   : nothing}`}
                 </h3>
                 <ha-icon-button
-                  ?disabled=${lockedWhileOff || value === null || (minTemp !== null && numericValue <= minTemp)}
+                  ?disabled=${lockedWhileOff || value === null || (bounds.min !== null && numericValue <= bounds.min)}
                   class="thermostat-trigger thermostat-trigger--down"
                   aria-label="Decrease ${field}"
                   .label=${`Decrease ${field}`}
@@ -924,24 +936,48 @@ export default class SimpleThermostat extends LitElement {
     }
   }
 
-  // One setpoint step in `dir` (+1/-1), clamped to the entity's min/max. Returns
-  // false when it can't step further (already at a bound, or an uninitialised
-  // value that was just seeded) so the hold-repeat loop knows to stop.
+  // Effective bounds for one setpoint: the entity's own min/max, narrowed by the
+  // sibling setpoint on a dual (heat_cool) entity. The disabled state of the +/-
+  // buttons and _stepSetpoint both read this, so the two can never disagree —
+  // press-and-hold drives the step function directly, bypassing the attribute.
+  // Equality is deliberately allowed: HA Core rejects only low > high, and HA's
+  // own control clamps *to* the sibling rather than stopping short of it.
+  _setpointBounds(field: string, minTemp: number | null, maxTemp: number | null) {
+    const relation = SETPOINT_SIBLING[field]
+    if (!relation) return { min: minTemp, max: maxTemp }
+    const sibling = Number(this._values[relation.field])
+    if (!Number.isFinite(sibling)) return { min: minTemp, max: maxTemp }
+    return relation.caps === 'max'
+      ? {
+          min: minTemp,
+          max: maxTemp === null ? sibling : Math.min(maxTemp, sibling),
+        }
+      : {
+          min: minTemp === null ? sibling : Math.max(minTemp, sibling),
+          max: maxTemp,
+        }
+  }
+
+  // One setpoint step in `dir` (+1/-1), clamped to the effective bounds above.
+  // Returns false when it can't step further (already at a bound, or an
+  // uninitialised value that was just seeded) so the hold-repeat loop knows to
+  // stop.
   _stepSetpoint(
     field: string,
     dir: 1 | -1,
     minTemp: number | null,
     maxTemp: number | null
   ): boolean {
+    const { min, max } = this._setpointBounds(field, minTemp, maxTemp)
     const raw = this._values[field]
     if (raw === null || raw === undefined) {
       // Uninitialised: the up button seeds it at the low bound once; down is a no-op.
-      if (dir > 0 && minTemp !== null) this.setTemperature(0, field, minTemp)
+      if (dir > 0 && min !== null) this.setTemperature(0, field, min)
       return false
     }
     const v = Number(raw)
-    if (dir > 0 && maxTemp !== null && v >= maxTemp) return false
-    if (dir < 0 && minTemp !== null && v <= minTemp) return false
+    if (dir > 0 && max !== null && v >= max) return false
+    if (dir < 0 && min !== null && v <= min) return false
     this.setTemperature(dir * this.stepSize, field)
     return true
   }
