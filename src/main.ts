@@ -114,6 +114,14 @@ interface Values {
   [key: string]: number | string
 }
 
+// A setpoint change waiting out the debounce. Entity and service are captured
+// when the change is made, not read when it fires — see _pendingSetTemperature.
+interface PendingSetTemperature {
+  entity: CardConfig['entity']
+  service: Service
+  values: object
+}
+
 export default class SimpleThermostat extends LitElement {
   static get styles() {
     return styles
@@ -157,11 +165,14 @@ export default class SimpleThermostat extends LitElement {
   static HOLD_MS = 500
   static DOUBLE_TAP_MS = 250
 
-  // Tracks whether a debounced setTemperature call is still waiting to fire.
-  // `debounce-fn` only exposes `.cancel()`, not `.flush()` — we track this
-  // ourselves so disconnectedCallback can send the pending value immediately
-  // instead of silently dropping it (see _performCleanup).
-  _pendingSetTemperature = false
+  // The debounced setTemperature call still waiting to fire, or null.
+  // `debounce-fn` only exposes `.cancel()`, not `.flush()` — we keep the
+  // payload ourselves so disconnectedCallback can send it immediately instead
+  // of silently dropping it (see _performCleanup). It holds the entity and
+  // service too: the visual editor reuses the element and calls setConfig
+  // again when the user picks a different entity, and a queued change must
+  // land on the device it was made for, not follow the card to the new one.
+  _pendingSetTemperature: PendingSetTemperature | null = null
 
   // Press-and-hold repeat for the setpoint +/- buttons: after an initial delay
   // the step repeats until release. Separate from the _holdTimer above (which
@@ -172,19 +183,31 @@ export default class SimpleThermostat extends LitElement {
   static REPEAT_DELAY_MS = 500
   static REPEAT_INTERVAL_MS = 300
 
-  _sendSetTemperature(values: object) {
-    const { domain, service, data = {} } = this.service
+  _sendSetTemperature(pending: PendingSetTemperature) {
+    const { domain, service, data = {} } = pending.service
     this._callAction(`${domain}.${service}`, {
-      entity_id: this.config.entity,
+      entity_id: pending.entity,
       ...data,
-      ...values,
+      ...pending.values,
     })
   }
 
+  // Send a queued change right now instead of waiting out the debounce. Used
+  // on disconnect and before a config swap — in both cases the next scheduled
+  // call would otherwise replace this one and the change would be lost.
+  _flushPendingSetTemperature() {
+    const pending = this._pendingSetTemperature
+    this._pendingSetTemperature = null
+    if (pending) {
+      this._sendSetTemperature(pending)
+    }
+    this._debouncedSetTemperature?.cancel?.()
+  }
+
   _debouncedSetTemperature = debounce(
-    (values: object) => {
-      this._pendingSetTemperature = false
-      this._sendSetTemperature(values)
+    (pending: PendingSetTemperature) => {
+      this._pendingSetTemperature = null
+      this._sendSetTemperature(pending)
     },
     {
       wait: DEBOUNCE_TIMEOUT,
@@ -192,11 +215,23 @@ export default class SimpleThermostat extends LitElement {
   )
 
   _callAction(action: string, data: object) {
+    let result: unknown
     if (typeof this._hass.performAction === 'function') {
-      this._hass.performAction({ action, data })
+      result = this._hass.performAction({ action, data })
     } else {
       const [domain, service] = action.split('.')
-      this._hass.callService(domain, service, data)
+      result = this._hass.callService(domain, service, data)
+    }
+    // Both HA APIs return a promise. Unhandled, a rejected call (entity gone,
+    // service refused) surfaces as an unhandled rejection whose stack points
+    // into HA's own code — no hint at which card fired it, hence the prefix.
+    // The optimistic value is corrected by the next state update regardless,
+    // so this logs and does not roll back.
+    const pending = result as Promise<unknown> | undefined
+    if (pending && typeof pending.catch === 'function') {
+      pending.catch((err: unknown) => {
+        console.error(`simple-thermostat: ${action} failed`, err)
+      })
     }
   }
 
@@ -218,12 +253,31 @@ export default class SimpleThermostat extends LitElement {
     if (!config?.entity) {
       throw new Error('simple-thermostat: entity is required')
     }
+    // Send any queued setpoint change before the config swaps underneath it.
+    // The payload already carries its own entity, so it lands correctly either
+    // way — but without this a step on the *new* entity within the debounce
+    // window would replace the queued one and drop it silently.
+    this._flushPendingSetTemperature()
+    const previousEntity = this.config?.entity
     this.config = {
       decimals: DECIMALS,
       ...config,
     }
     this.service = parseService(this.config.service ?? false, getAdapter(this.config.entity))
     this._needsRecompute = true
+
+    // A different entity means the optimistic setpoint state describes a device
+    // we no longer show. Left standing, updateFromHass takes neither branch (it
+    // only adopts HA's values while not updating) and the new entity inherits
+    // the previous one's setpoint — which the next +/- step would then write to
+    // it. Clear it so the new entity's values come from HA.
+    if (previousEntity && previousEntity !== this.config.entity) {
+      this._updatingValues = false
+      if (this._updatingValuesTimeout) {
+        clearTimeout(this._updatingValuesTimeout)
+        this._updatingValuesTimeout = null
+      }
+    }
 
     if (this._hass?.states) {
       this.updateFromHass(this._hass)
@@ -271,11 +325,7 @@ export default class SimpleThermostat extends LitElement {
     // Flush instead of drop: if the user changed the setpoint and navigated
     // away before the 500ms debounce fired, send it now rather than losing
     // the change silently.
-    if (this._pendingSetTemperature) {
-      this._pendingSetTemperature = false
-      this._sendSetTemperature(this._values)
-    }
-    this._debouncedSetTemperature?.cancel?.()
+    this._flushPendingSetTemperature()
   }
 
   updated(changedProperties: PropertyValues) {
@@ -339,6 +389,18 @@ export default class SimpleThermostat extends LitElement {
       if (this._trackedStateRefs[id] !== newState) {
         hasChanges = true
         this._trackedStateRefs[id] = newState
+      }
+    }
+
+    // Drop refs the config no longer tracks — an editor change swaps entities
+    // out, and without this the map keeps them for the element's lifetime.
+    // Runs unconditionally: the list is config-sized, and a tracked entity
+    // that is missing from hass.states never becomes a key here, so a length
+    // comparison would not be a reliable guard anyway.
+    const tracked = new Set(trackedIds)
+    for (const id of Object.keys(this._trackedStateRefs)) {
+      if (!tracked.has(id)) {
+        delete this._trackedStateRefs[id]
       }
     }
 
@@ -840,8 +902,13 @@ export default class SimpleThermostat extends LitElement {
       ...this._values,
       [field]: +formatNumber(newValue, { decimals }),
     }
-    this._pendingSetTemperature = true
-    this._debouncedSetTemperature(this._values)
+    const pending: PendingSetTemperature = {
+      entity: this.config.entity,
+      service: this.service,
+      values: this._values,
+    }
+    this._pendingSetTemperature = pending
+    this._debouncedSetTemperature(pending)
   }
 
   // Live preview while dragging the dial ring: the slider emits `value-changing`
