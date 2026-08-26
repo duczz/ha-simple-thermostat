@@ -8,6 +8,9 @@ dist/
 # Test coverage
 coverage
 
+# Visual smoke test screenshots
+test-results/
+
 # Logs
 *.log
 npm-debug.log*

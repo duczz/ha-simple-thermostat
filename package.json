@@ -30,6 +30,7 @@
     "concurrently": "^9.1.0",
     "cross-env": "^7.0.3",
     "jsdom": "^29.1.1",
+    "playwright": "^1.62.1",
     "postcss": "^8.5.26",
     "postcss-preset-env": "^10.1.1",
     "prettier": "^3.4.2",
@@ -44,6 +45,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "test:visual": "npm run build && node scripts/visual-smoke.mjs",
     "build": "cross-env NODE_ENV=production rollup -c",
     "postversion": "npm run build",
     "dev": "concurrently 'npm:dev:*'",

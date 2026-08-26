@@ -28,3 +28,37 @@ jobs:
         run: npm test
         env:
           CI: true
+
+  # Separate job: jsdom never lays anything out, so the unit suite cannot catch
+  # layout regressions. This renders the built bundle in a real browser.
+  visual:
+    name: Layout smoke test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Render the card and check its layout
+        run: npm run test:visual
+        env:
+          CI: true
+
+      # Uploaded on failure too — the screenshots are how you see what moved.
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-smoke-screenshots
+          path: test-results/visual/
+          if-no-files-found: warn

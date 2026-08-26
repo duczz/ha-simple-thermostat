@@ -14,6 +14,7 @@ A maintenance release: no new features and nothing changes visually.
 
 - **Stale entity references cleaned up** — Removing a sensor (or any other tracked entity) from the card's configuration left its state reference behind in the update-tracking map for as long as the card stayed on the dashboard. Housekeeping only — no behaviour changed.
 - **CodeQL static analysis** — Security scanning for JavaScript/TypeScript now runs on every push and pull request, plus weekly.
+- **Layout smoke test** — The unit suite runs in jsdom, which never lays anything out, so layout regressions could not be caught by it. A new check (`npm run test:visual`) renders the built card in a real browser at desktop and mobile widths and asserts that the dial stays a proper circle and the setpoint stays centred on cards without sensors — both of which have broken before. It runs in CI and uploads screenshots.
 
 ## [2.4.2] – 2026-08-10
 
