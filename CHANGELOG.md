@@ -2,21 +2,21 @@
 
 ## [2.4.3] – 2026-08-26
 
-A maintenance release: no new features and nothing changes visually.
+A maintenance release: no new features. Nothing changes visually unless you have a heat/cool device — those got a layout fix.
 
 ### 🐛 Bug Fixes
 
-- **Dual setpoints spilled outside the card** — On a `heat_cool` entity with a temperature range, the second setpoint was pushed past the card's right edge on a normal dashboard column — roughly 160–180px outside at 320–480px wide, so the "+" button and part of the value were simply not on the card. The two setpoints now wrap onto separate lines when the space is too tight, and sit side by side as before when it isn't. Measured in a live Home Assistant instance: 400px and 480px columns are clean now; on a very narrow card (~320px, small phones) the buttons still overhang slightly, which is a large improvement but not yet perfect.
-- **A queued temperature change could land on the wrong device** — Adjusting the setpoint and then switching the card to a different entity within half a second (the debounce window) sent the queued value to the *newly selected* entity instead of the one it was made for. Affects the visual editor, whose live preview reuses the same card element and controls real devices. The queued change now carries its own entity and service, and is sent before the configuration is swapped.
-- **Switching entity carried the previous setpoint over** — After changing the card to another entity while a setpoint change was still in flight, the card kept showing the previous device's target temperature, and the next +/- step wrote that value to the new device. The new entity's values are now read from Home Assistant.
-- **Failed actions are no longer silent** — When Home Assistant rejected an action (entity removed, service refused, connection lost), the card dropped the rejected promise. Nothing showed up in the browser console, and the stack trace that did appear pointed into Home Assistant's own code with no hint at which card caused it. Failures are now logged with the action that failed. As before, the displayed value corrects itself on the next state update.
-- **Heat/cool setpoints could be stepped past each other** — On a `heat_cool` entity (air conditioners and heat pumps, which hold a temperature *range*) the +/- buttons let you raise the low target above the high one, or lower the high below the low. Home Assistant rejects that combination outright, so the value jumped and then snapped back with an error. Each setpoint now limits the other: the button greys out at the crossing point, the same way it already does at the entity's own min/max. Setting both to the same value is still allowed, matching Home Assistant, and a range that arrives already crossed can still be corrected — only steps that would make it worse are blocked.
+- **Dual setpoints spilled outside the card** — On a `heat_cool` entity the second setpoint was pushed past the card's right edge on narrower dashboard columns, so the "+" button and part of the value simply weren't on the card. The two now wrap onto separate lines when space is tight, and sit side by side when it isn't. On a very narrow card (~320px, small phones) a slight overhang remains.
+- **A queued temperature change could land on the wrong device** — Adjusting the setpoint and then switching the card to a different entity within the debounce window sent the queued value to the *newly selected* entity. Mostly reachable in the visual editor, whose live preview controls real devices. The queued change now carries its own entity and is sent before the configuration is swapped.
+- **Switching entity carried the previous setpoint over** — After changing the card to another entity mid-adjustment, it kept showing the previous device's target, and the next +/- step wrote that value to the new device. The new entity's values are now read from Home Assistant.
+- **Failed actions are no longer silent** — When Home Assistant rejected an action (entity removed, service refused, connection lost), the card discarded the rejection and nothing reached the browser console. Failures are now logged with the action that failed.
+- **Heat/cool setpoints could be stepped past each other** — On a `heat_cool` entity (air conditioners and heat pumps, which hold a temperature *range*) the +/- buttons let you raise the low target above the high one — a combination Home Assistant rejects outright. Each setpoint now limits the other, greying the button out at the crossing point. Equal values stay allowed, and an already-crossed range can still be corrected.
 
 ### 🧹 Internal
 
-- **Stale entity references cleaned up** — Removing a sensor (or any other tracked entity) from the card's configuration left its state reference behind in the update-tracking map for as long as the card stayed on the dashboard. Housekeeping only — no behaviour changed.
+- **Stale entity references cleaned up** — Removing a tracked entity from the card's configuration left its state reference behind for as long as the card stayed on the dashboard. Housekeeping only.
 - **CodeQL static analysis** — Security scanning for JavaScript/TypeScript now runs on every push and pull request, plus weekly.
-- **Layout smoke test** — The unit suite runs in jsdom, which never lays anything out, so layout regressions could not be caught by it. A new check (`npm run test:visual`) renders the built card in a real browser at desktop and mobile widths and asserts that the dial stays a proper circle and the setpoint stays centred on cards without sensors — both of which have broken before. It runs in CI and uploads screenshots.
+- **Layout smoke test** — The unit suite runs in jsdom, which never lays anything out. A new check (`npm run test:visual`) renders the built card in a real browser at desktop and mobile widths and asserts that the dial stays circular and the setpoint stays centred. Runs in CI.
 
 ## [2.4.2] – 2026-08-10
 
