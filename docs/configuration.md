@@ -163,6 +163,18 @@ setpoints:
   target_temp_high:
 ```
 
+On a dual thermostat the two targets limit each other: the low target cannot be
+stepped above the high one, and the high cannot be stepped below the low. The
+button greys out at that point, the same way it does at the entity's own
+`min_temp` / `max_temp`. Setting both to the same value is allowed. Home
+Assistant rejects a crossed range outright, so this only stops a step that could
+never have taken effect — and if an integration reports a range that is already
+crossed, you can still step out of it; only the steps that would make it worse
+are blocked.
+
+On narrow dashboard columns the two setpoints wrap onto separate lines so they
+stay inside the card; with enough room they sit side by side as before.
+
 ---
 
 <a id="control-config"></a>
@@ -217,7 +229,7 @@ control:
 
 The three most common secondary controls (`preset`, `fan`, `swing`) also expose this as a **"Hide … when off"** toggle in the visual editor's Controls section. In YAML the `_hide_when_off` key works for every mode type, including `swing_vertical` / `swing_horizontal` and `vane_horizontal` / `vane_vertical`.
 
-The **setpoint** needs no flag: while a `climate` entity is off it shows the action label instead of a value, and its +/- buttons are disabled — Home Assistant ignores `set_temperature` in that state anyway. `fan` and `humidifier` entities stay adjustable while off, because setting their percentage / humidity is a meaningful command there.
+The **setpoint** needs no flag: while a `climate` entity is off it shows the action label instead of a value, and its +/- buttons are disabled. The reason is feedback, not validation — the display shows the off label rather than a number, so a step would change the target invisibly, with nothing on the card moving. (Home Assistant itself does not reject `set_temperature` on a switched-off entity; whether the device acts on it is up to the integration.) `fan` and `humidifier` entities stay adjustable while off, because setting their percentage / humidity is a meaningful command there.
 
 > 💡 Per-mode **names and icons** (e.g. `cool` → "Kühlen") can be set in the visual editor's **Mode labels** section as well — no need to hand-write the `control` dictionary. A renamed mode shows consistently on the mode buttons, the built-in **State** sensor row, and the dial's center label (an active `idle` action still shows there so you can tell the unit is only idling).
 
