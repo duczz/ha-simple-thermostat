@@ -402,6 +402,15 @@ header {
      a wide sensor column can't push the dial past the card edge (the dial caps
      itself with max-width: 100%). */
   min-width: 0;
+  /* A dual (heat_cool) entity puts two steppers side by side. `.body` is a grid
+     whose track floor is min-content, which `min-width: 0` above cannot lower —
+     so on a normal dashboard column the second stepper was pushed outside the
+     card (measured: ~160-180px past the edge at 320-480px wide). Wrapping drops
+     this element's min-content from "both steppers" to "the wider one", which
+     the grid can then fit. Only ever engages with more than one child, i.e.
+     dual setpoints that genuinely run out of room: a single setpoint and both
+     dial layouts have exactly one child and are unaffected. */
+  flex-wrap: wrap;
 }
 
 /* The grid packs to the left, so a narrow sensor column (list/table) leaves
