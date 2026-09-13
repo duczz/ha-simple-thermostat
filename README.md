@@ -8,7 +8,7 @@
 [![Home Assistant][ha-badge]][ha-url]
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/duczz/ha-simple-thermostat?style=for-the-badge&color=22c55e)][release-url]
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=duczz&repository=ha-simple-thermostat&category=dashboard)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=duczz&repository=ha-simple-thermostat&category=plugin)
 
 </div>
 
